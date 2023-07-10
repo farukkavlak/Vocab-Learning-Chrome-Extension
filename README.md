@@ -116,12 +116,12 @@ To use the extension, just press the extension's shortcut while watching a movie
 Screenshots are black because of the Netflix Privacy Issues
 <div align="center">
   <a>
-    <img src="https://github.com/farukkavlak/Vocab-Learning-Chrome-Extension/blob/main/extension/logo.png" alt="Logo">
+    <img src="https://github.com/farukkavlak/Vocab-Learning-Chrome-Extension/blob/main/screenshots/usage-1.png" alt="usage-1">
   </a>
 </div>
 <div align="center">
   <a>
-    <img src="https://github.com/farukkavlak/Vocab-Learning-Chrome-Extension/blob/main/extension/logo.png" alt="Logo" width="180" height="180">
+    <img src="https://github.com/farukkavlak/Vocab-Learning-Chrome-Extension/blob/main/screenshots/usage-2.png" alt="usage-2">
   </a>
 </div>
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

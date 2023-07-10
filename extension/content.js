@@ -114,7 +114,7 @@ function createButton(text, left, top, width, height, i) {
     };
     button.addEventListener("click", function () {
         removeButtons();
-        fetch(chatChatGptServerUrl + text)
+        fetch(chatChatGptServerUrl + "/?input=" + text) // "http://localhost:3000/?input=
             .then(res => res.json())
             .then(result => {
                 createCustomAlert();

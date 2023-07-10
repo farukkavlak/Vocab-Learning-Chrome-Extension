@@ -1,0 +1,34 @@
+{
+    "name": "VocabBoost",
+    "version": "1.0",
+    "manifest_version": 3,
+    "description": "Vocabulary learning extension powered by AI.It is designed to be used to learn when there is a word that you do not understand in the subtitle while watching a movie.",
+    "permissions": ["activeTab", "commands","tabs","notifications","scripting" ],
+    "host_permissions": ["*://*/*"],
+    "background": {
+      "service_worker": "background.js"
+    },
+    "commands": {
+      "take-screenshot": {
+        "suggested_key": {
+          "default": "Ctrl+H",
+            "mac": "Command+H"
+        },
+        "description": "Take a screenshot of the current tab"
+      }
+    },
+	"content_scripts":[
+		{
+		  "matches": ["*://*/*"],
+		  "js": ["content.js"],
+		  "all_frames": false
+		}
+	  ]
+    ,   
+    "icons": {
+      "16": "logo.png",
+      "32": "logo.png",
+      "48": "logo.png",
+      "128": "logo.png"
+  }
+  }

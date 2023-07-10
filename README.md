@@ -12,7 +12,7 @@
   <p align="center">
     Vocabulary learning extension powered by AI/ChatGPT
     <br>
-    <a href="https://github.com/github_username/repo_name">View Demo</a>
+    <a href="#usage">Screenshots</a>
     ·
     <a href="https://github.com/farukkavlak/Vocab-Learning-Chrome-Extension/issues">Report Bug</a>
     ·
@@ -119,6 +119,7 @@ Screenshots are black because of the Netflix Privacy Issues
     <img src="https://github.com/farukkavlak/Vocab-Learning-Chrome-Extension/blob/main/screenshots/usage-1.png" alt="usage-1">
   </a>
 </div>
+<br>
 <div align="center">
   <a>
     <img src="https://github.com/farukkavlak/Vocab-Learning-Chrome-Extension/blob/main/screenshots/usage-2.png" alt="usage-2">

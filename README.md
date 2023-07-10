@@ -1,1 +1,146 @@
-# Vocab-Learning-Chrome-Extension
+<a name="readme-top"></a>
+
+<!-- PROJECT LOGO -->
+<br />
+<div align="center">
+  <a>
+    <img src="https://github.com/farukkavlak/Vocab-Learning-Chrome-Extension/blob/main/extension/logo.png" alt="Logo" width="180" height="180">
+  </a>
+
+<h3 align="center">VocabBoost</h3>
+
+  <p align="center">
+    Vocabulary learning extension powered by AI/ChatGPT
+    <br>
+    <a href="https://github.com/github_username/repo_name">View Demo</a>
+    ·
+    <a href="https://github.com/farukkavlak/Vocab-Learning-Chrome-Extension/issues">Report Bug</a>
+    ·
+    <a href="https://github.com/farukkavlak/Vocab-Learning-Chrome-Extension/issues">Request Feature</a>
+  </p>
+</div>
+
+
+
+<!-- TABLE OF CONTENTS -->
+<details>
+  <summary>Table of Contents</summary>
+  <ol>
+    <li>
+      <a href="#about-the-project">About The Project</a>
+      <ul>
+        <li><a href="#built-with">Built With</a></li>
+        <li><a href="#external-services">External Services</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#getting-started">Getting Started</a>
+      <ul>
+        <li><a href="#installation">Installation</a></li>
+      </ul>
+    </li>
+    <li><a href="#usage">Usage</a></li>
+    <li><a href="#contributing">Contributing</a></li>
+    <li><a href="#contact">Contact</a></li>
+  </ol>
+</details>
+
+
+
+<!-- ABOUT THE PROJECT -->
+## About The Project
+Vocabulary learning extension powered by AI.It is designed to be used to learn when there is a word that you do not understand in the subtitle while watching a movie.
+It is a chrome extension that allows you to ask artificial intelligence for an explanation and example sentence with the help of a shortcut in real time when you encounter an English word that you do not know while watching a movie,series etc.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+### Built With
+
+* [![javascript][javascript]][javascript]
+* [![node-js][node-js]][node-js]
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+### External Services
+
+* ChatGPT
+* Google Vision API - Optical Character Recognition (OCR)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+<!-- GETTING STARTED -->
+## Getting Started
+
+This is an example of how you may give instructions on setting up your project locally.
+To get a local copy up and running follow these simple example steps.
+
+### Installation
+
+1. Get a API Key at [https://platform.openai.com/](https://platform.openai.com/)
+2. Get a API Key at [https://cloud.google.com/vision](https://cloud.google.com/vision/docs/before-you-begin)
+3. Clone the repo
+   ```sh
+   git clone https://github.com/farukkavlak/Vocab-Learning-Chrome-Extension.git
+   ```
+4. There are two folder in project such as Extension and Server
+5. Install NPM packages in the server
+   ```sh
+   npm install
+   ```
+6. Create .env file in Server for environment variables and enter your OpenAI API key
+     ```js
+   STATUS = dev
+   DEV_PORT = 3000
+   PROD_PORT = 80
+   OPENAI_API_KEY = 'ENTER YOUR API KEY'
+   
+   ```
+7. Enter your Google Vision API key and your server url(http://localhost/3000) in the extension/content.js
+8. Run server
+    ```sh
+   node index.js
+   ```
+9. Load chrome extension from chrome://extensions/
+
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+<!-- USAGE EXAMPLES -->
+## Usage
+
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+
+<!-- CONTRIBUTING -->
+## Contributing
+
+Any contributions you make are **greatly appreciated**.
+
+If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
+Don't forget to give the project a star! Thanks again!
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+<!-- CONTACT -->
+## Contact
+
+Ömer Faruk Kavlak -  [linkedin.com/in/ömerfarukkavlak](https://www.linkedin.com/in/ömerfarukkavlak/)- [@ofarukdev](https://twitter.com/ofarukdev) - ofaruk.kavlak@gmail.com
+
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+<!-- MARKDOWN LINKS & IMAGES -->
+<!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
+[javascript]: https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black
+[node-js]: https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white

@@ -99,7 +99,7 @@ To get a local copy up and running follow these simple example steps.
 7. Enter your Google Vision API key and your server url(http://localhost/3000) in the extension/content.js
 8. Run server
     ```sh
-   node index.js
+   nodemon index.js
    ```
 9. Load chrome extension from chrome://extensions/
 

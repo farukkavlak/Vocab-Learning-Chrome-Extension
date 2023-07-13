@@ -96,7 +96,7 @@ To get a local copy up and running follow these simple example steps.
    OPENAI_API_KEY = 'ENTER YOUR API KEY'
    
    ```
-7. Enter your Google Vision API key and your server url(http://localhost/3000) in the extension/content.js
+7. Enter your Google Vision API key and your server url(http://localhost:3000/) in the extension/content.js
 8. Run server
     ```sh
    nodemon index.js

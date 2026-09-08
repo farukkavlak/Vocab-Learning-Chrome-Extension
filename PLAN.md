@@ -59,26 +59,26 @@ No tooling, no logic. Just remove what is plainly dead.
 
 Set the workbench up once, before touching any behaviour.
 
-- [ ] Root `package.json` with npm workspaces (`extension`, `server`)
-- [ ] Vite build for the extension; salvage `vite.config.ts` from the `refactor` branch,
+- [x] Root `package.json` with npm workspaces (`extension`, `server`)
+- [x] Vite build for the extension; salvage `vite.config.ts` from the `refactor` branch,
       and make it copy the manifest and static assets so `npm run build` emits a
       directory that loads as an unpacked extension
-- [ ] TypeScript + `tsconfig.json` (no wildcard `paths`) and `@types/chrome`
-- [ ] Mechanically port `background.js` and `content.js` to `.ts` — types only, no logic
+- [x] TypeScript + `tsconfig.json` (no wildcard `paths`) and `@types/chrome`
+- [x] Mechanically port `background.js` and `content.js` to `.ts` — types only, no logic
       changes. It is ~250 lines total.
-- [ ] ESLint flat config + `@typescript-eslint`
-- [ ] Prettier with default settings (no bikeshedding) + `eslint-config-prettier`
-- [ ] `.editorconfig`
-- [ ] Scripts: `build`, `lint`, `format`, `typecheck`
-- [ ] `husky` + `lint-staged` so commits are formatted automatically
-- [ ] Run `prettier --write .` once, as the last commit on the branch
+- [x] ESLint flat config + `@typescript-eslint`
+- [x] Prettier with default settings (no bikeshedding) + `eslint-config-prettier`
+- [x] `.editorconfig`
+- [x] Scripts: `build`, `lint`, `format`, `typecheck`
+- [x] `husky` + `lint-staged` so commits are formatted automatically
+- [x] Run `prettier --write .` once, as the last commit on the branch
 
 `server/` is left out of the port on purpose — it is rewritten from scratch in Phase 6,
 so converting it now would be thrown away. Lint may ignore it until then.
 
-**Open decision:** no popup exists yet, so nothing forces a UI framework. Recommendation
-is plain TypeScript and CSS for both the overlay and the settings page — React plus
-Tailwind for one settings form is more machinery than the project earns.
+**Decided:** plain TypeScript and CSS for both the overlay and the settings page. No
+popup exists yet, so nothing forced a UI framework, and React plus Tailwind for one
+settings form is more machinery than the project earns.
 
 ### Phase 3 — `refactor/remove-ocr`
 
@@ -146,15 +146,15 @@ Keeping both behind one interface means the "hosted backend or bring-your-own-ke
 decision does not have to be made now.
 
 **The schema is the point.** What changed since 2023 is less that models got better and
-more what we are able to ask. Not "what does *run* mean" but "what does *run* mean in
-*He had to run the whole department alone*":
+more what we are able to ask. Not "what does _run_ mean" but "what does _run_ mean in
+_He had to run the whole department alone_":
 
 ```ts
 type Meaning = {
   meaningInContext: string;
   translation: string;
   partOfSpeech: string;
-  cefr: 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+  cefr: "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
   phrase?: string; // set when the word belongs to an idiom / phrasal verb
 };
 ```

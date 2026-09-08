@@ -31,13 +31,14 @@ Four things are wrong with that, and they are the reason for this rewrite:
 
 - [ ] `extension/content.js` holds `googleVisionApiKey` client-side (placeholder today,
       but the design puts a paid key in the client)
-- [ ] `extension/manifest.json` requests `notifications`, `scripting` and `tabs`, none of
+- [x] `extension/manifest.json` requests `notifications`, `scripting` and `tabs`, none of
       which are used; `host_permissions` and `content_scripts.matches` are both `*://*/*`
-- [ ] `chrome.runtime.onMessage.removeListener(arguments.callee)` inside a `.then`
+- [x] `chrome.runtime.onMessage.removeListener(arguments.callee)` inside a `.then`
       callback targets the wrong listener and throws in strict mode — dead line
+- [x] `content.js` builds a `buttons` array that is never read
 - [ ] Every style is inline in `content.js`; there is no stylesheet
-- [ ] Two `.gitignore` files (root and `server/`) that mostly duplicate each other
-- [ ] `server/` depends on `nodemon` as a production dependency
+- [x] Two `.gitignore` files (root and `server/`) that mostly duplicate each other
+- [x] `server/` depends on `nodemon` as a production dependency
 - [ ] `AnswerFormat.js` exists only to patch up leading/trailing punctuation in free-text
       model output — the problem structured output removes entirely
 
@@ -47,12 +48,12 @@ Four things are wrong with that, and they are the reason for this rewrite:
 
 No tooling, no logic. Just remove what is plainly dead.
 
-- [ ] Merge the two `.gitignore` files into one at the root
-- [ ] Drop the `notifications`, `scripting` and `tabs` permissions from the manifest
-- [ ] Narrow `host_permissions` and `content_scripts.matches` from `*://*/*` to the
+- [x] Merge the two `.gitignore` files into one at the root
+- [x] Drop the `notifications`, `scripting` and `tabs` permissions from the manifest
+- [x] Narrow `host_permissions` and `content_scripts.matches` from `*://*/*` to the
       platforms actually supported
-- [ ] Delete the `removeListener(arguments.callee)` line
-- [ ] Move `nodemon` to `devDependencies`
+- [x] Delete the `removeListener(arguments.callee)` line
+- [x] Move `nodemon` to `devDependencies`
 
 ### Phase 2 — `chore/toolchain`
 
@@ -86,7 +87,8 @@ Tailwind for one settings form is more machinery than the project earns.
       `isScreenshot` message
 - [ ] Delete the bbox→percentage math (`dpr`, `scrollOffset`, `innerWidth`) and the
       per-word absolutely positioned buttons
-- [ ] Drop the screenshot-related permissions from the manifest
+- [ ] Drop `https://vision.googleapis.com/*` from `host_permissions` (kept in Phase 1
+      only so the current behaviour was not broken by narrowing the wildcard)
 - [ ] Replace with a subtitle ring buffer: a `MutationObserver` on the caption container
       keeping the last ~5 lines with their `video.currentTime`
 

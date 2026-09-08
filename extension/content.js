@@ -118,7 +118,6 @@ function createButton(text, left, top, width, height, i) {
             .then(res => res.json())
             .then(result => {
                 createCustomAlert();
-                chrome.runtime.onMessage.removeListener(arguments.callee);
                 alert(result.result);
             })
 
@@ -129,7 +128,6 @@ function createButton(text, left, top, width, height, i) {
 document.addEventListener("keydown", escKeyHandler);
 
 chrome.runtime.onMessage.addListener(async function (request, sender, sendResponse) {
-    let buttons = [];
     pauseVideo();
 
     //Use Google Vision API to get text from image
@@ -185,7 +183,6 @@ chrome.runtime.onMessage.addListener(async function (request, sender, sendRespon
 
         const button = createButton(text, left, top, width, height, i);
         container.appendChild(button);
-        buttons.push(button);
     }
 
     document.body.appendChild(container);

@@ -1,48 +1,125 @@
-interface ScreenshotMessage {
-  isScreenshot: boolean;
-  dataUrl: string;
+const SERVER_URL = "http://localhost:3000";
+
+// YouTube only for now; Phase 4 turns this into a per-platform adapter.
+const CAPTION_CONTAINER_SELECTOR = ".ytp-caption-window-container";
+
+const BUFFER_SIZE = 5;
+const CONTAINER_POLL_MS = 1000;
+const PANEL_ID = "vocab-container";
+
+interface CaptionLine {
+  text: string;
+  at: number;
 }
 
-interface Vertex {
-  x: number;
-  y: number;
-}
-
-interface TextAnnotation {
-  description: string;
-  boundingPoly: { vertices: Vertex[] };
-}
-
-function playVideo(): void {
-  document.querySelectorAll("video").forEach((video) => {
-    void video.play();
-  });
-}
-
-function pauseVideo(): void {
-  document.querySelectorAll("video").forEach((video) => {
-    video.pause();
-  });
-}
-
-function removeButtons(): void {
-  document.getElementById("vocab-container")?.remove();
+interface LookupMessage {
+  type: "LOOKUP_SUBTITLE";
 }
 
 /**
- * If words contain a number, symbol, skip
+ * The last few subtitle lines, oldest first. The buffer exists because the caption
+ * container is emptied between lines: by the time the user reacts to a word, the line
+ * they saw may already be gone from the DOM.
+ */
+const buffer: CaptionLine[] = [];
+
+let observed: Element | null = null;
+let observer: MutationObserver | null = null;
+
+function getVideo(): HTMLVideoElement | null {
+  return document.querySelector("video");
+}
+
+function playVideo(): void {
+  void getVideo()?.play();
+}
+
+function pauseVideo(): void {
+  getVideo()?.pause();
+}
+
+function readCaption(container: Element): string {
+  // innerText, not textContent: the container holds one span per caption segment and
+  // textContent would glue them together without spaces.
+  return (container as HTMLElement).innerText.replace(/\s+/g, " ").trim();
+}
+
+function record(text: string): void {
+  if (!text || buffer[buffer.length - 1]?.text === text) {
+    return;
+  }
+
+  buffer.push({ text, at: getVideo()?.currentTime ?? 0 });
+  if (buffer.length > BUFFER_SIZE) {
+    buffer.shift();
+  }
+}
+
+function observe(container: Element): void {
+  observer?.disconnect();
+  observed = container;
+  observer = new MutationObserver(() => {
+    record(readCaption(container));
+  });
+  observer.observe(container, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+  });
+  record(readCaption(container));
+}
+
+/**
+ * The caption container is created when subtitles are turned on and destroyed on SPA
+ * navigation, so it cannot be looked up once at startup. Polling for it every second is
+ * cheaper and far less noisy than observing the whole document on a page like YouTube.
+ */
+function watchForCaptionContainer(): void {
+  setInterval(() => {
+    const container = document.querySelector(CAPTION_CONTAINER_SELECTOR);
+    if (container && container !== observed) {
+      observe(container);
+    } else if (!container && observed) {
+      observer?.disconnect();
+      observer = null;
+      observed = null;
+    }
+  }, CONTAINER_POLL_MS);
+}
+
+/**
+ * The line the user is reacting to: whatever is on screen right now, or the last line
+ * that was, if the caption has already been cleared.
+ */
+function currentLine(): CaptionLine | null {
+  const container = document.querySelector(CAPTION_CONTAINER_SELECTOR);
+  const onScreen = container ? readCaption(container) : "";
+  if (onScreen) {
+    return { text: onScreen, at: getVideo()?.currentTime ?? 0 };
+  }
+
+  return buffer[buffer.length - 1] ?? null;
+}
+
+/**
+ * If a word contains a number or a symbol, or is too short, it is not worth looking up.
  */
 function filterText(text: string): boolean {
   return /\d|[!@#$%^&*(),.?":{}|<>]/.test(text) || text.length < 2;
 }
 
+function closePanel(): void {
+  document.getElementById(PANEL_ID)?.remove();
+  playVideo();
+}
+
 function escKeyHandler(e: KeyboardEvent): void {
   if (e.key === "Escape") {
-    removeButtons();
-    playVideo();
+    closePanel();
   }
 }
 
+// Kept as-is from the original until Phase 5 replaces it with a real overlay.
 function createCustomAlert(): void {
   window.alert = (message: string) => {
     const alertBox = document.createElement("div");
@@ -87,43 +164,23 @@ function createCustomAlert(): void {
   };
 }
 
-function createButton(
-  text: string,
-  left: string,
-  top: string,
-  width: string,
-  height: string,
-  i: number,
-): HTMLButtonElement {
-  const chatChatGptServerUrl = "YOUR_SERVER_URL";
+function createWordButton(word: string): HTMLButtonElement {
   const button = document.createElement("button");
-  button.textContent = text;
-  button.style.position = "absolute";
-  button.style.left = left;
-  button.style.top = top;
-  button.style.width = width;
-  button.style.height = height;
+  button.textContent = word;
   button.style.backgroundColor = "#d0451b";
   button.style.borderRadius = "10px";
   button.style.border = "1px solid #942911";
   button.style.color = "#ffffff";
   button.style.fontFamily = "Arial";
-  button.style.fontSize = "14px";
-  button.style.textDecoration = "none";
+  button.style.fontSize = "18px";
   button.style.textShadow = "0px 1px 0px #854629";
   button.style.cursor = "pointer";
   button.style.boxShadow = "inset 0px 1px 0px 0px #cf866c";
-  button.style.padding = "2px 2px";
-  button.style.display = "flex";
-  button.style.justifyContent = "center";
-  button.style.alignItems = "center";
-  button.style.textAlign = "center";
-  button.style.zIndex = "99999999";
-  button.id = `button-${i}`;
+  button.style.padding = "6px 10px";
 
   button.addEventListener("click", () => {
-    removeButtons();
-    void fetch(`${chatChatGptServerUrl}/?input=${text}`) // "http://localhost:3000/?input=
+    closePanel();
+    void fetch(`${SERVER_URL}/?input=${encodeURIComponent(word)}`)
       .then((res) => res.json())
       .then((result: { result: string }) => {
         createCustomAlert();
@@ -134,69 +191,51 @@ function createButton(
   return button;
 }
 
-document.addEventListener("keydown", escKeyHandler);
+function openPanel(line: CaptionLine): void {
+  document.getElementById(PANEL_ID)?.remove();
 
-chrome.runtime.onMessage.addListener((request: ScreenshotMessage) => {
-  void (async () => {
-    pauseVideo();
+  const panel = document.createElement("div");
+  panel.id = PANEL_ID;
+  panel.style.position = "fixed";
+  panel.style.left = "50%";
+  panel.style.bottom = "12%";
+  panel.style.transform = "translateX(-50%)";
+  panel.style.display = "flex";
+  panel.style.flexWrap = "wrap";
+  panel.style.gap = "8px";
+  panel.style.justifyContent = "center";
+  panel.style.maxWidth = "80%";
+  panel.style.padding = "12px";
+  panel.style.borderRadius = "12px";
+  panel.style.backgroundColor = "rgba(0, 0, 0, 0.75)";
+  panel.style.zIndex = "99999999";
 
-    // Use Google Vision API to get text from image
-    const googleVisionApiKey = "YOUR_GOOGLE_VISION_API_KEY";
-    const googleVisionUrl = `https://vision.googleapis.com/v1/images:annotate?key=${googleVisionApiKey}`;
-
-    const imageData = request.dataUrl.replace("data:image/png;base64,", "");
-
-    const payload = {
-      requests: [
-        {
-          image: { content: imageData },
-          features: [{ type: "TEXT_DETECTION" }],
-        },
-      ],
-    };
-
-    const response = await fetch(googleVisionUrl, {
-      method: "POST",
-      body: JSON.stringify(payload),
-      headers: { "Content-Type": "application/json" },
-    });
-
-    const data = (await response.json()) as {
-      responses: { textAnnotations: TextAnnotation[] }[];
-    };
-    const textAnnotations = data.responses[0]?.textAnnotations ?? [];
-
-    const container = document.createElement("div");
-    container.style.height = "100vh";
-    container.id = "vocab-container";
-
-    for (let i = 1; i < textAnnotations.length; i++) {
-      const annotation = textAnnotations[i];
-      if (!annotation || filterText(annotation.description)) {
-        continue;
-      }
-
-      const vertices = annotation.boundingPoly.vertices;
-      const [topLeft, topRight, bottomRight] = vertices;
-      if (!topLeft || !topRight || !bottomRight) {
-        continue;
-      }
-
-      const dpr = window.devicePixelRatio || 1;
-      const scrollOffset = window.pageYOffset > 0 ? window.pageYOffset : 0;
-
-      const left = `${(topLeft.x / (window.innerWidth * dpr)) * 100}%`;
-      const top = `${((topLeft.y + scrollOffset) / (window.innerHeight * dpr)) * 100}%`;
-      const width = `${((topRight.x - topLeft.x) / (window.innerWidth * dpr)) * 100}%`;
-      const height = `${((bottomRight.y - topRight.y) / (window.innerHeight * dpr)) * 100}%`;
-
-      container.appendChild(
-        createButton(annotation.description, left, top, width, height, i),
-      );
+  for (const word of line.text.split(" ")) {
+    const cleaned = word.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "");
+    if (filterText(cleaned)) {
+      continue;
     }
 
-    document.body.appendChild(container);
-  })();
+    panel.appendChild(createWordButton(cleaned));
+  }
 
-  return true;
+  document.body.appendChild(panel);
+}
+
+document.addEventListener("keydown", escKeyHandler);
+
+chrome.runtime.onMessage.addListener((message: LookupMessage) => {
+  if (message.type !== "LOOKUP_SUBTITLE") {
+    return;
+  }
+
+  const line = currentLine();
+  if (!line) {
+    return;
+  }
+
+  pauseVideo();
+  openPanel(line);
 });
+
+watchForCaptionContainer();

@@ -3,22 +3,21 @@
   "version": "1.0",
   "manifest_version": 3,
   "description": "Vocabulary learning extension powered by AI. Look up a word from the subtitles without leaving the video.",
-  "permissions": ["activeTab", "commands"],
   "host_permissions": [
     "*://*.youtube.com/*",
     "*://*.netflix.com/*",
-    "https://vision.googleapis.com/*"
+    "http://localhost:3000/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
   "commands": {
-    "take-screenshot": {
+    "lookup-subtitle": {
       "suggested_key": {
         "default": "Ctrl+H",
         "mac": "Command+H"
       },
-      "description": "Take a screenshot of the current tab"
+      "description": "Look up a word from the current subtitle line"
     }
   },
   "content_scripts": [

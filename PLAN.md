@@ -29,7 +29,7 @@ Four things are wrong with that, and they are the reason for this rewrite:
 
 ## Known defects in the current code
 
-- [ ] `extension/content.js` holds `googleVisionApiKey` client-side (placeholder today,
+- [x] `extension/content.js` holds `googleVisionApiKey` client-side (placeholder today,
       but the design puts a paid key in the client)
 - [x] `extension/manifest.json` requests `notifications`, `scripting` and `tabs`, none of
       which are used; `host_permissions` and `content_scripts.matches` are both `*://*/*`
@@ -82,14 +82,14 @@ settings form is more machinery than the project earns.
 
 ### Phase 3 — `refactor/remove-ocr`
 
-- [ ] Delete the Google Vision call, the API key constant and the base64 payload
-- [ ] Delete the screenshot path in `background.ts` (`captureVisibleTab`) and the
+- [x] Delete the Google Vision call, the API key constant and the base64 payload
+- [x] Delete the screenshot path in `background.ts` (`captureVisibleTab`) and the
       `isScreenshot` message
-- [ ] Delete the bbox→percentage math (`dpr`, `scrollOffset`, `innerWidth`) and the
+- [x] Delete the bbox→percentage math (`dpr`, `scrollOffset`, `innerWidth`) and the
       per-word absolutely positioned buttons
-- [ ] Drop `https://vision.googleapis.com/*` from `host_permissions` (kept in Phase 1
+- [x] Drop `https://vision.googleapis.com/*` from `host_permissions` (kept in Phase 1
       only so the current behaviour was not broken by narrowing the wildcard)
-- [ ] Replace with a subtitle ring buffer: a `MutationObserver` on the caption container
+- [x] Replace with a subtitle ring buffer: a `MutationObserver` on the caption container
       keeping the last ~5 lines with their `video.currentTime`
 
 Ends with the extension smaller, its permissions harmless, and no third-party OCR bill.

@@ -50,24 +50,37 @@ const PLATFORMS = {
   },
 };
 
-/** What the stubbed server answers, in the shape the 2023 one still uses. */
+/** The definition the stubbed dictionary returns for every word. */
 export const MEANING = "to manage or be in charge of something";
+export const EXAMPLE = "She runs the department single-handed.";
+export const AUDIO =
+  "https://api.dictionaryapi.dev/media/pronunciations/en/run-uk.mp3";
+
+/** One entry in the shape api.dictionaryapi.dev answers with. */
+export function entry(senses = [{ definition: MEANING, example: EXAMPLE }]) {
+  return [
+    {
+      word: "run",
+      phonetic: "/rʌn/",
+      phonetics: [{ text: "/rʌn/", audio: AUDIO }],
+      meanings: [{ partOfSpeech: "verb", definitions: senses }],
+    },
+  ];
+}
 
 interface WatchOptions {
   platform?: keyof typeof PLATFORMS;
-  /** The lookup's answer, or "unreachable" to fail the request instead. */
-  meaning?: Record<string, unknown> | "unreachable";
+  /** An entry, "missing" for the API's 404, or "unreachable" for the service being down. */
+  dictionary?: unknown[] | "missing" | "unreachable";
 }
 
 /**
- * A watch page with the extension on it. The fixture is served under the platform's own
- * URL so the manifest's match pattern applies and the content script is injected exactly
- * as it would be in production, and the meaning server is stubbed so no test depends on
- * anything running on localhost.
+ * A watch page with the extension on it, served under the platform's own URL so the
+ * manifest's match pattern applies and the content script is injected as in production.
  */
 export async function watchPage(
   context: BrowserContext,
-  { platform = "youtube", meaning = { result: MEANING } }: WatchOptions = {},
+  { platform = "youtube", dictionary = entry() }: WatchOptions = {},
 ): Promise<Page> {
   const { url, pattern, fixture } = PLATFORMS[platform];
   const html = readFileSync(resolve(here, fixture), "utf8");
@@ -75,18 +88,47 @@ export async function watchPage(
   await context.route(pattern, (route) =>
     route.fulfill({ contentType: "text/html", body: html }),
   );
-  await context.route("http://localhost:3000/**", (route) =>
-    meaning === "unreachable"
-      ? route.abort()
-      : route.fulfill({
-          contentType: "application/json",
-          body: JSON.stringify(meaning),
-        }),
-  );
+  await context.route("https://api.dictionaryapi.dev/**", (route) => {
+    // The pronunciation lives on the same host as the entries.
+    if (route.request().url().endsWith(".mp3")) {
+      return route.fulfill({ contentType: "audio/mpeg", body: "" });
+    }
+
+    if (dictionary === "unreachable") {
+      return route.abort();
+    }
+
+    if (dictionary === "missing") {
+      return route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({ title: "No Definitions Found" }),
+      });
+    }
+
+    return route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(dictionary),
+    });
+  });
 
   const page = await context.newPage();
   await page.goto(url);
   return page;
+}
+
+/**
+ * Required before measuring anything: a rect read mid-animation is where the animation
+ * has it, not where it was placed.
+ */
+export async function settled(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const root = document.getElementById("vocab-root")?.shadowRoot;
+    const running = [...(root?.querySelectorAll("*") ?? [])].flatMap(
+      (element) => element.getAnimations(),
+    );
+    await Promise.all(running.map((animation) => animation.finished));
+  });
 }
 
 /** Starts the video and waits for it to actually be playing. */

@@ -19,8 +19,7 @@ if (source) {
   const buffer = new CaptionBuffer();
   source.attach((line) => buffer.push(line));
 
-  // Only what we paused do we start again: the user may have paused the video
-  // themselves before asking for a lookup, and resuming it then would be a surprise.
+  // Only what we paused do we start again.
   let paused: HTMLVideoElement | null = null;
 
   const stopWatchingPlayback = (): void => {
@@ -28,11 +27,7 @@ if (source) {
     paused = null;
   };
 
-  /**
-   * The user can resume the video in ways this extension never hears about: the player's
-   * own button, Space, a double click. Whichever it is, the panel has to get out of the
-   * way — otherwise the video plays on behind a frozen panel with its captions hidden.
-   */
+  /** The player's own button, Space, a double click: none of them come through here. */
   function onPlay(): void {
     stopWatchingPlayback();
     closeOverlays();
@@ -45,10 +40,7 @@ if (source) {
     void video?.play();
   };
 
-  /**
-   * The line the user is reacting to plus the one before it. Reads what is on screen,
-   * falling back to the buffer when the caption has already been cleared.
-   */
+  /** What is on screen, falling back to the buffer once the caption has cleared. */
   const linesToShow = (): { text: string; previous?: string } | null => {
     const onScreen = source.readCurrent();
     const recent = buffer.recent(2).map((line) => line.text);
@@ -91,7 +83,6 @@ if (source) {
       return;
     }
 
-    // One step at a time: the card first, then the panel.
     if (isMeaningOpen()) {
       closeMeaning();
       return;
@@ -100,7 +91,6 @@ if (source) {
     dismiss();
   });
 
-  // Clicking away is how every overlay is dismissed; the panel should be no different.
   document.addEventListener("click", (event) => {
     if (isPanelOpen() && !isInsidePanel(event.target)) {
       dismiss();

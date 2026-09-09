@@ -18,11 +18,9 @@ const MIN_WIDTH = 320;
 interface PanelOptions {
   text: string;
   previous?: string | undefined;
-  /** Where the caption text sits; the panel takes that spot while open. */
   captionRect: Rect | null;
-  /** The caption layer, hidden so the words are not drawn twice. */
+  /** Hidden while the panel stands in for it, so the words are not drawn twice. */
   captionElement: HTMLElement | null;
-  /** The caption's own font size, matched so the panel reads as the subtitle. */
   captionFontSize: number | null;
 }
 
@@ -50,11 +48,7 @@ function focusWord(
   next?.focus();
 }
 
-/**
- * Every token is rendered, so the line still reads as the sentence it stands in for.
- * Only the words worth a lookup become buttons; punctuation, numbers and one-letter
- * words stay as plain text.
- */
+/** Every token is rendered so the line still reads as a sentence; only some are buttons. */
 function buildLine(
   root: ShadowRoot,
   panel: HTMLElement,
@@ -79,7 +73,9 @@ function buildLine(
     // The raw token, so punctuation stays in the sentence; the lookup uses the word.
     button.textContent = token;
     button.setAttribute("aria-expanded", "false");
-    button.addEventListener("click", () => openCard(root, panel, button, word));
+    button.addEventListener("click", () =>
+      openCard(root, panel, button, word, text),
+    );
     button.addEventListener("keydown", (event) => {
       if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
         event.preventDefault();
@@ -127,11 +123,8 @@ function buildPanel(root: ShadowRoot, options: PanelOptions): HTMLElement {
 }
 
 /**
- * How wide the line may run before it wraps. A single-line caption should stay a single
- * line, and the panel needs exactly as much extra room as its decoration takes — the
- * hover padding on each word plus its own padding, which follows the word count, not
- * the caption's width. Past that it wraps where the caption's own line did, so a caption
- * the player broke in two does not become one window-wide line.
+ * The caption's width plus what the hover padding adds, which follows the word count.
+ * Past that the line wraps where the caption's did.
  */
 function widthFor(panel: HTMLElement, rect: Rect): number {
   const ceiling = window.innerWidth * MAX_WIDTH_RATIO;
@@ -150,10 +143,8 @@ function widthFor(panel: HTMLElement, rect: Rect): number {
 }
 
 /**
- * Puts the panel where the caption was, or centred near the bottom if it is gone.
- * What has to stay put is the words, not the box around them: the previous line and the
- * hint sit outside the caption's own place, and the panel is taller than the caption it
- * replaces, so growing downwards from the caption's top would run it off the screen.
+ * Aligned by its line of words, not by its box: the panel is taller than the caption it
+ * replaces, and captions sit near the bottom of the screen.
  */
 function position(panel: HTMLElement, rect: Rect | null): void {
   if (!rect || rect.width === 0) {
@@ -177,9 +168,7 @@ function position(panel: HTMLElement, rect: Rect | null): void {
   );
   panel.style.top = `${top}px`;
 
-  // Line the words up on a second pass, now that the panel has been laid out and the
-  // line's own position can be measured. Centres rather than edges: the panel's line box
-  // and the caption's are not the same height, so only their middles are comparable.
+  // Centres, not edges: the two line boxes are not the same height.
   const line = panel.querySelector(".line")?.getBoundingClientRect();
   if (line) {
     const captionCentre = rect.top + rect.height / 2;
@@ -195,8 +184,7 @@ function position(panel: HTMLElement, rect: Rect | null): void {
 /** Matched to the caption, so the panel reads as the subtitle at any player size. */
 function scaleTo(captionFontSize: number): void {
   host?.style.setProperty("--size", `${captionFontSize}px`);
-  // Bounded: the card is prose, and prose set at caption size is unreadable in
-  // fullscreen and too small in a tiny window.
+  // Bounded: prose set at caption size is unreadable in fullscreen.
   host?.style.setProperty(
     "--meaning-size",
     `${clamp(captionFontSize * 0.7, 13, 18)}px`,
@@ -247,19 +235,17 @@ export function openPanel(options: PanelOptions): void {
 
   const panel = buildPanel(root, options);
   root.appendChild(panel);
-  // In fullscreen the browser only paints descendants of the fullscreen element, so
-  // anything appended to document.body would simply not be drawn.
+  // In fullscreen only descendants of the fullscreen element are painted.
   (document.fullscreenElement ?? document.body).appendChild(host);
 
-  // Hide the real caption only once the panel is standing in for it, so the words never
-  // disappear from the screen even for a frame.
+  // Hidden only once the panel stands in for it, so no frame is left without words.
   position(panel, options.captionRect);
+  panel.classList.add("appear");
   if (options.captionElement) {
     hiddenCaption = options.captionElement;
     hiddenCaption.style.visibility = "hidden";
   }
 
-  // Focus the panel rather than a word: focusing one would mark an arbitrary word as if
-  // it were selected. The arrow keys step from here into the line.
+  // Not a word: focusing one would mark it as if it were selected.
   panel.focus();
 }

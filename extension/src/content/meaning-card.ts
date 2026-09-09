@@ -1,5 +1,6 @@
 import { clamp, EDGE } from "./layout";
 import { lookupWord } from "./lookup";
+import { LookupError } from "./meaning";
 import type { Meaning } from "./meaning";
 
 /** Between the card and the panel it belongs to. */
@@ -55,32 +56,83 @@ function paragraph(className: string, text: string): HTMLElement {
   return element;
 }
 
+/** Fetched, not set as a src: a remote src answers to the host page's CSP, ours does not. */
+async function speak(url: string): Promise<void> {
+  const response = await fetch(url);
+  const objectUrl = URL.createObjectURL(await response.blob());
+  const audio = new Audio(objectUrl);
+  audio.addEventListener("ended", () => URL.revokeObjectURL(objectUrl));
+  await audio.play();
+}
+
+function speaker(url: string): HTMLElement {
+  const button = document.createElement("button");
+  button.className = "speak";
+  button.type = "button";
+  button.title = "Play pronunciation";
+  button.setAttribute("aria-label", "Play pronunciation");
+  button.innerHTML =
+    '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+    '<path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/>' +
+    '<path d="M16 8.5a4.5 4.5 0 0 1 0 7" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.8" stroke-linecap="round"/></svg>';
+  button.addEventListener("click", () => {
+    void speak(url).catch(() => button.classList.add("unavailable"));
+  });
+  return button;
+}
+
+function head(word: string, meaning: Meaning): HTMLElement {
+  const element = document.createElement("div");
+  element.className = "head";
+
+  const title = document.createElement("h1");
+  title.textContent = word;
+  element.append(title);
+
+  if (meaning.phonetic) {
+    const phonetic = document.createElement("span");
+    phonetic.className = "phonetic";
+    phonetic.textContent = meaning.phonetic;
+    element.append(phonetic);
+  }
+
+  if (meaning.audio) {
+    element.append(speaker(meaning.audio));
+  }
+
+  if (meaning.partOfSpeech) {
+    element.append(badge(meaning.partOfSpeech));
+  }
+
+  if (meaning.cefr) {
+    element.append(badge(meaning.cefr, "cefr"));
+  }
+
+  return element;
+}
+
 function render(card: HTMLElement, word: string, meaning: Meaning): void {
   card.className = "meaning";
   card.textContent = "";
 
   const arrow = document.createElement("div");
   arrow.className = "arrow";
-
-  const head = document.createElement("div");
-  head.className = "head";
-  const title = document.createElement("h1");
-  title.textContent = word;
-  head.append(title);
-  if (meaning.partOfSpeech) {
-    head.append(badge(meaning.partOfSpeech));
-  }
-  if (meaning.cefr) {
-    head.append(badge(meaning.cefr, "cefr"));
-  }
-
-  card.append(arrow, head);
+  card.append(arrow, head(word, meaning));
 
   if (meaning.phrase) {
     card.append(paragraph("phrase", meaning.phrase));
   }
 
-  card.append(paragraph("body", meaning.meaningInContext));
+  for (const sense of meaning.senses) {
+    const element = document.createElement("div");
+    element.className = "sense";
+    element.append(paragraph("definition", sense.definition));
+    if (sense.example) {
+      element.append(paragraph("example", sense.example));
+    }
+    card.append(element);
+  }
 
   if (meaning.translation) {
     card.append(paragraph("translation", meaning.translation));
@@ -104,6 +156,7 @@ export function openCard(
   panel: HTMLElement,
   button: HTMLElement,
   word: string,
+  sentence: string,
 ): void {
   closeCard(root);
   button.setAttribute("aria-expanded", "true");
@@ -113,21 +166,35 @@ export function openCard(
   card.id = "vocab-meaning";
   const arrow = document.createElement("div");
   arrow.className = "arrow";
-  card.append(arrow, paragraph("body", `Looking up "${word}"…`));
+  card.append(arrow, paragraph("definition", `Looking up "${word}"…`));
   root.appendChild(card);
   place(card, button, panel);
+  card.classList.add("appear");
 
   const fill = (meaning: Meaning): void => {
-    // The card may have been closed, or another word opened, while the request was out.
+    // Closed, or another word opened, while the request was out.
     if (!card.isConnected) {
       return;
     }
 
+    card.classList.remove("appear");
     render(card, word, meaning);
     place(card, button, panel);
+    card.classList.add("appear");
   };
 
-  void lookupWord(word)
+  void lookupWord(word, sentence)
     .then(fill)
-    .catch(() => fill({ meaningInContext: `Could not look up "${word}".` }));
+    .catch((error: unknown) =>
+      fill({
+        senses: [
+          {
+            definition:
+              error instanceof LookupError
+                ? error.message
+                : `Could not look up "${word}".`,
+          },
+        ],
+      }),
+    );
 }

@@ -5,8 +5,7 @@ import prettier from "eslint-config-prettier";
 
 export default tseslint.config(
   {
-    // server/ is rewritten from scratch in Phase 6; linting it now buys nothing.
-    ignores: ["**/dist/**", "**/node_modules/**", "server/**"],
+    ignores: ["**/dist/**", "**/node_modules/**"],
   },
   js.configs.recommended,
   {

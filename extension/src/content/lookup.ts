@@ -1,22 +1,20 @@
-import type { Meaning } from "./meaning";
+import { readCache, writeCache } from "./cache";
+import type { Meaning, MeaningProvider } from "./meaning";
+import { dictionary } from "./providers/dictionary";
 
-const SERVER_URL = "http://localhost:3000";
+/** The dictionary answers first; the model is a second step the reader asks for. */
+const provider: MeaningProvider = dictionary;
 
-/**
- * The 2023 server answers with a bare string. The provider rewrite answers with the
- * whole `Meaning`, and the card already lays every field out, so both shapes are
- * accepted here rather than holding the panel back until then.
- */
-export async function lookupWord(word: string): Promise<Meaning> {
-  const response = await fetch(
-    `${SERVER_URL}/?input=${encodeURIComponent(word)}`,
-  );
-  const body = (await response.json()) as Partial<Meaning> & {
-    result?: string;
-  };
+export async function lookupWord(
+  word: string,
+  sentence: string,
+): Promise<Meaning> {
+  const cached = await readCache(provider, word, sentence);
+  if (cached) {
+    return cached;
+  }
 
-  return {
-    ...body,
-    meaningInContext: body.meaningInContext ?? body.result ?? "",
-  };
+  const meaning = await provider.lookup(word, sentence);
+  await writeCache(provider, word, sentence, meaning);
+  return meaning;
 }

@@ -5,14 +5,32 @@ import { test, lookup, watchPage } from "./fixture";
 
 const OUT = process.env.SHOT_DIR ?? "shots";
 
-// The whole schema, so the card is reviewed as it will look once the provider rewrite
-// fills every field in.
-const MEANING = {
-  meaningInContext: "to be the only person doing something, with no help",
-  translation: "tek başına, yardımsız",
-  partOfSpeech: "adverb",
-  cefr: "A2",
-};
+// Two senses with an example, which is what the dictionary actually answers with.
+const ENTRY = [
+  {
+    word: "alone",
+    phonetic: "/əˈləʊn/",
+    phonetics: [
+      {
+        text: "/əˈləʊn/",
+        audio:
+          "https://api.dictionaryapi.dev/media/pronunciations/en/alone-uk.mp3",
+      },
+    ],
+    meanings: [
+      {
+        partOfSpeech: "adverb",
+        definitions: [
+          {
+            definition: "Without outside help.",
+            example: "The job was too hard for me to do alone.",
+          },
+          { definition: "By oneself; apart from, or exclusive of, others." },
+        ],
+      },
+    ],
+  },
+];
 
 const scene = (captionBottom: number) => `
   video { width: 1280px; height: 720px; object-fit: cover;
@@ -24,7 +42,7 @@ const scene = (captionBottom: number) => `
 `;
 
 async function open(context: BrowserContext, captionBottom: number) {
-  const page = await watchPage(context, { meaning: MEANING });
+  const page = await watchPage(context, { dictionary: ENTRY });
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.addStyleTag({ content: scene(captionBottom) });
   await page.evaluate(() => window.showCaption(["he had to run the whole"]));
@@ -76,7 +94,7 @@ test("@shots a caption the player broke into two lines", async ({
   context,
   worker,
 }) => {
-  const page = await watchPage(context, { meaning: MEANING });
+  const page = await watchPage(context, { dictionary: ENTRY });
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.addStyleTag({ content: scene(72) });
   await page.evaluate(() =>

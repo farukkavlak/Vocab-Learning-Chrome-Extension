@@ -1,28 +1,29 @@
-import { test, expect, lookup, play, watchPage } from "./fixture";
+import { test, expect, lookup, play, settled, watchPage } from "./fixture";
 
 test("stands in for the caption instead of appearing somewhere else", async ({
   context,
   worker,
 }) => {
   const page = await watchPage(context);
+  // Raised clear of the bottom margin, so nothing is nudged and the alignment can be
+  // asserted to the pixel. The case where it is nudged has its own test below.
+  await page.addStyleTag({ content: ".caption-window { bottom: 160px }" });
   await page.evaluate(() =>
     window.showCaption(["he had to run the department"]),
   );
   await lookup(worker);
+  await settled(page);
 
   const text = await page.locator(".ytp-caption-segment").first().boundingBox();
   const line = await page.locator("#vocab-panel .line").boundingBox();
   const panel = await page.locator("#vocab-panel").boundingBox();
 
-  // Where the words are, not where the caption layer starts (that layer covers the whole
-  // video) and not where the panel's box starts either: the panel is taller than the
-  // caption, so only its line of words can sit in the caption's place.
+  // The line of words, not the panel's box and not the caption layer, which covers the
+  // whole video.
   const centre = (box: { y: number; height: number } | null): number =>
     (box?.y ?? 0) + (box?.height ?? 0) / 2;
 
-  // Not to the pixel: this caption sits close enough to the bottom that the panel is
-  // nudged up a little to keep its last row on screen.
-  expect(Math.abs(centre(line) - centre(text))).toBeLessThanOrEqual(3);
+  expect(Math.abs(centre(line) - centre(text))).toBeLessThanOrEqual(1);
   expect(line?.y ?? 0).toBeGreaterThan(200);
 
   // The panel grows upwards from there and stays on screen.
@@ -71,6 +72,7 @@ test("opens the meaning above the word when there is no room below", async ({
   const word = page.getByRole("button", { name: "run", exact: true });
   await word.click();
   await expect(page.locator("#vocab-meaning")).toContainText("to manage");
+  await settled(page);
 
   const wordBox = await word.boundingBox();
   const meaningBox = await page.locator("#vocab-meaning").boundingBox();
@@ -84,12 +86,12 @@ test("stays on screen in a window too short for it", async ({
   worker,
 }) => {
   const page = await watchPage(context);
-  // The panel is taller than the caption it replaces, and captions sit near the bottom.
   // Growing downwards from the caption used to run it off the bottom of the window.
   await page.setViewportSize({ width: 900, height: 420 });
   await page.evaluate(() => window.showCaption(["he had to run the whole"]));
   await page.evaluate(() => window.showCaption(["department alone this year"]));
   await lookup(worker);
+  await settled(page);
 
   const panel = await page.locator("#vocab-panel").boundingBox();
   expect(panel?.y ?? -1).toBeGreaterThanOrEqual(0);
@@ -128,10 +130,10 @@ test("the meaning never covers the line it explains", async ({
   );
   await lookup(worker);
 
-  // The first word: anchored on the word alone, the card would open right over the rest
-  // of the sentence, which is the context the meaning is being read in.
+  // Anchored on the word alone, the card would cover the rest of the sentence.
   await page.getByRole("button", { name: "had", exact: true }).click();
   await expect(page.locator("#vocab-meaning")).toContainText("to manage");
+  await settled(page);
 
   const line = await page.locator("#vocab-panel .line").boundingBox();
   const card = await page.locator("#vocab-meaning").boundingBox();

@@ -7,9 +7,11 @@ export default {
   name: "VocabBoost",
   version: "1.0",
   manifest_version: 3,
+  // No longer "powered by AI": the default path is a free dictionary and no key at all.
   description:
-    "Vocabulary learning extension powered by AI. Look up a word from the subtitles without leaving the video.",
-  host_permissions: [...matches, "http://localhost:3000/*"],
+    "Look up a word from the subtitles without leaving the video, and hear how it sounds.",
+  permissions: ["storage"],
+  host_permissions: [...matches, "https://api.dictionaryapi.dev/*"],
   background: {
     service_worker: "background.js",
   },

@@ -89,9 +89,9 @@ test("keeps punctuation on screen but looks up the bare word", async ({
     '"Wait," he said — 42 times, a lot.',
   );
 
-  const request = page.waitForRequest(/localhost:3000/);
+  const request = page.waitForRequest(/dictionaryapi/);
   await page.locator("#vocab-panel .word").last().click();
-  expect(new URL((await request).url()).searchParams.get("input")).toBe("lot");
+  expect(new URL((await request).url()).pathname).toMatch(/\/lot$/);
 });
 
 test("Escape closes the panel and resumes the video", async ({

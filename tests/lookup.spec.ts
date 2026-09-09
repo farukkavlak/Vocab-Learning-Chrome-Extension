@@ -19,7 +19,7 @@ test("says so when the lookup fails instead of failing silently", async ({
   context,
   worker,
 }) => {
-  const page = await watchPage(context, { meaning: "unreachable" });
+  const page = await watchPage(context, { dictionary: "unreachable" });
   await page.evaluate(() =>
     window.showCaption(["he had to run the department"]),
   );
@@ -36,7 +36,7 @@ test("Escape closes the meaning first, then the panel", async ({
   context,
   worker,
 }) => {
-  const page = await watchPage(context, { meaning: "unreachable" });
+  const page = await watchPage(context, { dictionary: "unreachable" });
   await play(page);
 
   await page.evaluate(() =>

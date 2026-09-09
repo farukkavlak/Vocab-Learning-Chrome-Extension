@@ -39,7 +39,7 @@ Four things are wrong with that, and they are the reason for this rewrite:
 - [x] Every style is inline in `content.js`; there is no stylesheet
 - [x] Two `.gitignore` files (root and `server/`) that mostly duplicate each other
 - [x] `server/` depends on `nodemon` as a production dependency
-- [ ] `AnswerFormat.js` exists only to patch up leading/trailing punctuation in free-text
+- [x] `AnswerFormat.js` exists only to patch up leading/trailing punctuation in free-text
       model output — the problem structured output removes entirely
 
 ## Phases
@@ -106,6 +106,11 @@ Playwright drives a real Chromium with the built extension loaded.
   still holds (caption container, subtitles button, a non-empty caption tracklist).
 - `npm run shots` — writes PNGs of the panel to `shots/`. Asserts nothing; it exists
   because the layout defects above were invisible in the test output.
+
+Anything asserting on geometry has to wait for the opening animation first (`settled()`
+in `tests/fixture.ts`). A rect read while an element animates is where the animation has
+it at that instant, not where it was placed — which is what an intermittent 2-4px failure
+in the alignment test turned out to be.
 
 Two things this cannot cover, and a human has to check once per platform (both were
 verified by hand on YouTube on 2026-09-09: the panel showed the words of the line that
@@ -220,14 +225,20 @@ free. The two are good at different things, measured against the free Wiktionary
 
 So the panel opens with the dictionary and offers the model as a second step:
 
-- [ ] `DictionaryApiProvider` — no key, free, the default. Fills `partOfSpeech`,
-      `meaningInContext`, `example`, `phonetic` and `audio`.
+- [x] `DictionaryApiProvider` — no key, free, the default. Fills `partOfSpeech`,
+      `senses`, `example`, `phonetic` and `audio`.
 - [ ] A control on the card — "in this sentence" — that asks `LlmProvider` with the whole
       line and replaces the body. Current SDK, current model, structured output.
-- [ ] Cache both in `chrome.storage.local`, keyed by (word, sentence).
-- [ ] Delete `AnswerFormat.js`; structured output removes the problem it patched.
-- [ ] Show at most the first two senses of one part of speech. Dumping 63 definitions on
+- [x] Cache in `chrome.storage.local`. Keyed by (provider, word), plus the sentence only
+      for a provider that reads it — the dictionary answers the same wherever the word
+      was met, so keying its answer by sentence would miss every hit.
+- [x] Delete `AnswerFormat.js`, and `server/` with it; structured output removes the
+      problem it patched.
+- [x] Show at most the first two senses of one part of speech. Dumping 63 definitions on
       someone who paused a film is worse than saying nothing.
+- [x] The pronunciation is fetched and played from a blob, not handed to the element as a
+      remote `src`: a content script's `fetch` carries the extension's host permissions,
+      while a media element loading a remote URL answers to the host page's CSP.
 
 Three things follow from putting the paid path behind a press:
 
@@ -251,9 +262,8 @@ _He had to run the whole department alone_":
 
 ```ts
 type Meaning = {
-  meaningInContext: string;
+  senses: { definition: string; example?: string }[];
   partOfSpeech?: string;
-  example?: string; // the dictionary's own, not an invented one
   phonetic?: string; // IPA
   audio?: string; // pronunciation the dictionary hosts
   phrase?: string; // set when the word belongs to an idiom / phrasal verb
@@ -261,6 +271,10 @@ type Meaning = {
   translation?: string; // only when a target language is set; off by default
 };
 ```
+
+`senses` is a list because the dictionary answers with several — it cannot know which one
+the line uses — while the model answers with exactly one. Everything else is optional:
+no provider supplies all of it, and the card draws what it is given.
 
 `phrase` matters: looking up "run" alone silently loses "run into". `cefr` lets the panel
 stay short for easy words. Both come from the model only. `translation` stays in the type

@@ -22,7 +22,6 @@ export const panelStyles = `
     line-height: 1.35;
     text-align: center;
     z-index: 2147483647;
-    animation: appear 140ms ease-out;
   }
 
   /* The panel takes focus so the arrow keys reach the line; it is not itself a control,
@@ -97,7 +96,12 @@ export const panelStyles = `
     text-align: left;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
     z-index: 2147483647;
-    animation: appear 120ms ease-out;
+  }
+
+  /* Added once placed: an element measured mid-animation reports where the animation
+     has it, not where it was put. */
+  .appear {
+    animation: appear 140ms ease-out;
   }
 
   /* Points back at the word, so the card is never mistaken for a page element. */
@@ -152,14 +156,63 @@ export const panelStyles = `
     letter-spacing: 0.03em;
   }
 
+  .phonetic {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.9em;
+  }
+
+  .speak {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6em;
+    height: 1.6em;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.75);
+    cursor: pointer;
+    transition: background-color 100ms ease-out;
+  }
+
+  .speak svg {
+    width: 1em;
+    height: 1em;
+  }
+
+  .speak:hover,
+  .speak:focus-visible {
+    background: rgba(255, 255, 255, 0.2);
+    outline: none;
+  }
+
+  /* The recording would not play: say so on the control rather than in the definition. */
+  .speak.unavailable {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .sense + .sense {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .definition {
+    margin: 0;
+  }
+
+  .example {
+    margin: 2px 0 0;
+    color: rgba(255, 255, 255, 0.55);
+    font-style: italic;
+  }
+
   .phrase {
     margin: 0 0 4px;
     color: #ffb59b;
     font-size: 0.92em;
-  }
-
-  .body {
-    margin: 0;
   }
 
   .translation {
@@ -181,8 +234,7 @@ export const panelStyles = `
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .panel,
-    .meaning {
+    .appear {
       animation: none;
     }
 

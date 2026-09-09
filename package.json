@@ -6,8 +6,7 @@
   "description": "Vocabulary learning browser extension",
   "license": "ISC",
   "workspaces": [
-    "extension",
-    "server"
+    "extension"
   ],
   "scripts": {
     "build": "npm run build --workspace extension",

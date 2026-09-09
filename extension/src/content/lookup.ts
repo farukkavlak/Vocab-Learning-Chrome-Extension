@@ -1,20 +1,37 @@
-import { readCache, writeCache } from "./cache";
-import type { Meaning, MeaningProvider } from "./meaning";
-import { dictionary } from "./providers/dictionary";
+import { LookupError } from "../meaning";
+import type { Meaning } from "../meaning";
+import type { LookupResult } from "../messages";
 
-/** The dictionary answers first; the model is a second step the reader asks for. */
-const provider: MeaningProvider = dictionary;
-
-export async function lookupWord(
+async function ask(
+  type: "LOOKUP_WORD" | "EXPLAIN_WORD",
   word: string,
   sentence: string,
 ): Promise<Meaning> {
-  const cached = await readCache(provider, word, sentence);
-  if (cached) {
-    return cached;
+  const result: LookupResult | undefined = await chrome.runtime.sendMessage({
+    type,
+    word,
+    sentence,
+  });
+
+  if (!result?.ok) {
+    throw result?.message
+      ? new LookupError(result.message)
+      : new Error(`Lookup failed for "${word}".`);
   }
 
-  const meaning = await provider.lookup(word, sentence);
-  await writeCache(provider, word, sentence, meaning);
-  return meaning;
+  return result.meaning;
+}
+
+export const lookupWord = (word: string, sentence: string): Promise<Meaning> =>
+  ask("LOOKUP_WORD", word, sentence);
+
+export const explainWord = (word: string, sentence: string): Promise<Meaning> =>
+  ask("EXPLAIN_WORD", word, sentence);
+
+/** False when no key has been entered, so the card can leave the step out. */
+export async function modelReady(): Promise<boolean> {
+  const ready: unknown = await chrome.runtime.sendMessage({
+    type: "MODEL_READY",
+  });
+  return ready === true;
 }

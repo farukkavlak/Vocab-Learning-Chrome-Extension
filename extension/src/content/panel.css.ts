@@ -222,6 +222,37 @@ export const panelStyles = `
     color: rgba(255, 255, 255, 0.72);
   }
 
+  .ask {
+    display: block;
+    margin-top: 8px;
+    padding: 4px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 7px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.75);
+    font: inherit;
+    font-size: 0.88em;
+    cursor: pointer;
+    transition: background-color 100ms ease-out;
+  }
+
+  .ask:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .note {
+    margin: 6px 0 0;
+    color: #ffb59b;
+    font-size: 0.92em;
+  }
+
+  .ask:not(:disabled):hover,
+  .ask:focus-visible {
+    background: rgba(255, 255, 255, 0.12);
+    outline: none;
+  }
+
   .pending {
     color: rgba(255, 255, 255, 0.5);
   }

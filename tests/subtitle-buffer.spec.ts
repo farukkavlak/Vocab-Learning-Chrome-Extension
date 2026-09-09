@@ -68,7 +68,8 @@ test("keeps punctuation on screen but looks up the bare word", async ({
   context,
   worker,
 }) => {
-  const page = await watchPage(context);
+  const lookups: string[] = [];
+  const page = await watchPage(context, { onLookup: (w) => lookups.push(w) });
 
   await page.evaluate(() =>
     window.showCaption(['"Wait," he said — 42 times, a lot.']),
@@ -89,9 +90,8 @@ test("keeps punctuation on screen but looks up the bare word", async ({
     '"Wait," he said — 42 times, a lot.',
   );
 
-  const request = page.waitForRequest(/dictionaryapi/);
   await page.locator("#vocab-panel .word").last().click();
-  expect(new URL((await request).url()).pathname).toMatch(/\/lot$/);
+  await expect.poll(() => lookups).toEqual(["lot"]);
 });
 
 test("Escape closes the panel and resumes the video", async ({

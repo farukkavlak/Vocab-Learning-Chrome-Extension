@@ -7,11 +7,8 @@ import {
   isPanelOpen,
   openPanel,
 } from "./panel";
+import type { Message } from "../messages";
 import { sourceFor } from "./sources";
-
-interface LookupMessage {
-  type: "LOOKUP_SUBTITLE";
-}
 
 const source = sourceFor(location.href);
 
@@ -97,7 +94,7 @@ if (source) {
     }
   });
 
-  chrome.runtime.onMessage.addListener((message: LookupMessage) => {
+  chrome.runtime.onMessage.addListener((message: Message) => {
     if (message.type !== "LOOKUP_SUBTITLE") {
       return;
     }

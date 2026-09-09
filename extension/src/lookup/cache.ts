@@ -1,12 +1,8 @@
-import type { Meaning, MeaningProvider } from "./meaning";
+import type { Cacheable, Meaning } from "../meaning";
 
 const PREFIX = "meaning";
 
-function key(
-  provider: MeaningProvider,
-  word: string,
-  sentence: string,
-): string {
+function key(provider: Cacheable, word: string, sentence: string): string {
   const parts = [PREFIX, provider.id, word.toLowerCase()];
   if (provider.usesSentence) {
     parts.push(sentence);
@@ -19,7 +15,7 @@ function key(
 // both sides swallow their failures.
 
 export async function readCache(
-  provider: MeaningProvider,
+  provider: Cacheable,
   word: string,
   sentence: string,
 ): Promise<Meaning | null> {
@@ -33,7 +29,7 @@ export async function readCache(
 }
 
 export async function writeCache(
-  provider: MeaningProvider,
+  provider: Cacheable,
   word: string,
   sentence: string,
   meaning: Meaning,

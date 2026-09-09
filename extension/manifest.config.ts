@@ -11,7 +11,12 @@ export default {
   description:
     "Look up a word from the subtitles without leaving the video, and hear how it sounds.",
   permissions: ["storage"],
-  host_permissions: [...matches, "https://api.dictionaryapi.dev/*"],
+  host_permissions: [
+    ...matches,
+    "https://api.dictionaryapi.dev/*",
+    "https://api.anthropic.com/*",
+    "https://api.openai.com/*",
+  ],
   background: {
     service_worker: "background.js",
   },

@@ -72,6 +72,9 @@ interface WatchOptions {
   platform?: keyof typeof PLATFORMS;
   /** An entry, "missing" for the API's 404, or "unreachable" for the service being down. */
   dictionary?: unknown[] | "missing" | "unreachable";
+  /** Called with each word the dictionary is asked for. Lookups run in the worker, so
+   *  the page never sees these requests. */
+  onLookup?: (word: string) => void;
 }
 
 /**
@@ -80,7 +83,7 @@ interface WatchOptions {
  */
 export async function watchPage(
   context: BrowserContext,
-  { platform = "youtube", dictionary = entry() }: WatchOptions = {},
+  { platform = "youtube", dictionary = entry(), onLookup }: WatchOptions = {},
 ): Promise<Page> {
   const { url, pattern, fixture } = PLATFORMS[platform];
   const html = readFileSync(resolve(here, fixture), "utf8");
@@ -93,6 +96,12 @@ export async function watchPage(
     if (route.request().url().endsWith(".mp3")) {
       return route.fulfill({ contentType: "audio/mpeg", body: "" });
     }
+
+    onLookup?.(
+      decodeURIComponent(new URL(route.request().url()).pathname)
+        .split("/")
+        .pop() ?? "",
+    );
 
     if (dictionary === "unreachable") {
       return route.abort();

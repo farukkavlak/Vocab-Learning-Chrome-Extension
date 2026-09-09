@@ -1,7 +1,7 @@
 import { clamp, EDGE } from "./layout";
-import { lookupWord } from "./lookup";
-import { LookupError } from "./meaning";
-import type { Meaning } from "./meaning";
+import { explainWord, lookupWord, modelReady } from "./lookup";
+import { LookupError } from "../meaning";
+import type { Meaning } from "../meaning";
 
 /** Between the card and the panel it belongs to. */
 const GAP = 8;
@@ -112,7 +112,29 @@ function head(word: string, meaning: Meaning): HTMLElement {
   return element;
 }
 
-function render(card: HTMLElement, word: string, meaning: Meaning): void {
+/** The dictionary says what the word can mean; this asks what it means here. */
+function inSentence(onPress: () => void): HTMLElement {
+  const button = document.createElement("button");
+  button.className = "ask";
+  button.type = "button";
+  button.textContent = "In this sentence →";
+  button.addEventListener("click", () => {
+    // A model call takes seconds; a button that still looks live but does nothing is
+    // worse than one that says what it is doing.
+    button.disabled = true;
+    button.textContent = "Asking…";
+    onPress();
+  });
+  return button;
+}
+
+function render(
+  card: HTMLElement,
+  word: string,
+  meaning: Meaning,
+  ask?: () => void,
+  note?: string,
+): void {
   card.className = "meaning";
   card.textContent = "";
 
@@ -136,6 +158,14 @@ function render(card: HTMLElement, word: string, meaning: Meaning): void {
 
   if (meaning.translation) {
     card.append(paragraph("translation", meaning.translation));
+  }
+
+  if (note) {
+    card.append(paragraph("note", note));
+  }
+
+  if (ask) {
+    card.append(inSentence(ask));
   }
 }
 
@@ -171,30 +201,53 @@ export function openCard(
   place(card, button, panel);
   card.classList.add("appear");
 
-  const fill = (meaning: Meaning): void => {
+  const fill = (meaning: Meaning, ask?: () => void, note?: string): void => {
     // Closed, or another word opened, while the request was out.
     if (!card.isConnected) {
       return;
     }
 
     card.classList.remove("appear");
-    render(card, word, meaning);
+    render(card, word, meaning, ask, note);
     place(card, button, panel);
     card.classList.add("appear");
   };
 
+  const said = (error: unknown): string =>
+    error instanceof LookupError
+      ? error.message
+      : `Could not look up "${word}".`;
+
+  // The model replaces the senses, not the pronunciation: it has none to give, and the
+  // reader should not lose what the dictionary already showed them — which holds when it
+  // fails too, so the answer stays on screen with the reason under it.
+  const explain = (dictionary: Meaning | null) => (): void => {
+    const spoken = {
+      phonetic: dictionary?.phonetic,
+      audio: dictionary?.audio,
+    };
+
+    void explainWord(word, sentence)
+      .then((meaning) => fill({ ...meaning, ...spoken }))
+      .catch((error: unknown) =>
+        dictionary
+          ? fill(dictionary, explain(dictionary), said(error))
+          : fill({ senses: [{ definition: said(error) }] }, explain(null)),
+      );
+  };
+
+  // Asked in parallel: the dictionary call is the slow one, and a button that leads
+  // nowhere should not be drawn at all.
+  const ready = modelReady();
+
   void lookupWord(word, sentence)
-    .then(fill)
-    .catch((error: unknown) =>
-      fill({
-        senses: [
-          {
-            definition:
-              error instanceof LookupError
-                ? error.message
-                : `Could not look up "${word}".`,
-          },
-        ],
-      }),
+    .then(async (meaning) =>
+      fill(meaning, (await ready) ? explain(meaning) : undefined),
+    )
+    .catch(async (error: unknown) =>
+      fill(
+        { senses: [{ definition: said(error) }] },
+        (await ready) ? explain(null) : undefined,
+      ),
     );
 }

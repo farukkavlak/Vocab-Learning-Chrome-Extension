@@ -1,5 +1,5 @@
-import { LookupError } from "../meaning";
-import type { Meaning, MeaningProvider } from "../meaning";
+import { LookupError } from "../../meaning";
+import type { Meaning, MeaningProvider } from "../../meaning";
 
 const ENDPOINT = "https://api.dictionaryapi.dev/api/v2/entries/en";
 /** "run" alone answers with 63 definitions. Two is what a paused film has room for. */

@@ -1,0 +1,223 @@
+import type { BrowserContext, Page, Worker } from "@playwright/test";
+import { test, expect, lookup, watchPage, MEANING } from "./fixture";
+
+const LINE = ["he had to run the department"];
+const ASK = "#vocab-meaning .ask";
+
+const ANSWER = {
+  definition: "to be in charge of the department",
+  partOfSpeech: "verb",
+  cefr: "B2",
+  phrase: "",
+};
+
+async function setKey(worker: Worker, id: string, key: string): Promise<void> {
+  await worker.evaluate(
+    async ([name, value]) =>
+      chrome.storage.local.set({ [`key ${name}`]: value, provider: name }),
+    [id, key],
+  );
+}
+
+async function openCard(
+  context: BrowserContext,
+  worker: Worker,
+): Promise<Page> {
+  const page = await watchPage(context);
+  await page.evaluate((line) => window.showCaption(line), LINE);
+  await lookup(worker);
+  await page.getByRole("button", { name: "run", exact: true }).click();
+  await expect(
+    page.locator("#vocab-meaning .definition").first(),
+  ).toBeVisible();
+  return page;
+}
+
+test("offers the model as a second step, once the dictionary has answered", async ({
+  context,
+  worker,
+}) => {
+  await setKey(worker, "anthropic", "sk-ant-test");
+  const page = await openCard(context, worker);
+  await expect(page.locator(ASK)).toHaveText("In this sentence →");
+});
+
+test("leaves the step out when no key has been added", async ({
+  context,
+  worker,
+}) => {
+  // Until the settings page exists there is nowhere to add a key, so a button leading
+  // to "add a key in the settings" would be a dead end.
+  const page = await openCard(context, worker);
+  await expect(page.locator(ASK)).toHaveCount(0);
+});
+
+test("asks the chosen provider with the whole line and shows what it answers", async ({
+  context,
+  worker,
+}) => {
+  const bodies: string[] = [];
+  const page = await watchPage(context);
+  await context.route("https://api.anthropic.com/**", (route) => {
+    bodies.push(route.request().postData() ?? "");
+    return route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        content: [{ type: "text", text: JSON.stringify(ANSWER) }],
+      }),
+    });
+  });
+  await setKey(worker, "anthropic", "sk-ant-test");
+
+  await page.evaluate((line) => window.showCaption(line), LINE);
+  await lookup(worker);
+  await page.getByRole("button", { name: "run", exact: true }).click();
+  await page.locator(ASK).click();
+
+  const card = page.locator("#vocab-meaning");
+  await expect(card.locator(".definition")).toHaveText(ANSWER.definition);
+  await expect(card.locator(".badge")).toHaveText(["verb", "B2"]);
+
+  // The line is the whole point: the word alone is what the dictionary already answered.
+  const sent = JSON.parse(bodies[0] ?? "{}") as {
+    model: string;
+    messages: { content: string }[];
+    output_config: { format: { type: string } };
+  };
+  expect(sent.messages[0]?.content).toContain("he had to run the department");
+  expect(sent.model).toBe("claude-haiku-4-5");
+  expect(sent.output_config.format.type).toBe("json_schema");
+});
+
+test("keeps the pronunciation the dictionary gave", async ({
+  context,
+  worker,
+}) => {
+  // The model has no recording to offer, and losing one the reader already had would
+  // make asking for the better answer a downgrade.
+  const page = await watchPage(context);
+  await context.route("https://api.anthropic.com/**", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        content: [{ type: "text", text: JSON.stringify(ANSWER) }],
+      }),
+    }),
+  );
+  await setKey(worker, "anthropic", "sk-ant-test");
+
+  await page.evaluate((line) => window.showCaption(line), LINE);
+  await lookup(worker);
+  await page.getByRole("button", { name: "run", exact: true }).click();
+  await page.locator(ASK).click();
+
+  await expect(page.locator("#vocab-meaning .definition")).toHaveText(
+    ANSWER.definition,
+  );
+  await expect(page.locator("#vocab-meaning .phonetic")).toHaveText("/rʌn/");
+  await expect(page.locator("#vocab-meaning .speak")).toBeVisible();
+});
+
+test("uses whichever provider the key belongs to", async ({
+  context,
+  worker,
+}) => {
+  let called = "";
+  const page = await watchPage(context);
+  await context.route("https://api.openai.com/**", (route) => {
+    called = "openai";
+    return route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        choices: [{ message: { content: JSON.stringify(ANSWER) } }],
+      }),
+    });
+  });
+  await setKey(worker, "openai", "sk-openai-test");
+
+  await page.evaluate((line) => window.showCaption(line), LINE);
+  await lookup(worker);
+  await page.getByRole("button", { name: "run", exact: true }).click();
+  await page.locator(ASK).click();
+
+  await expect(page.locator("#vocab-meaning .definition")).toHaveText(
+    ANSWER.definition,
+  );
+  expect(called).toBe("openai");
+});
+
+test("keeps the dictionary answer when the model call fails, and offers a retry", async ({
+  context,
+  worker,
+}) => {
+  const page = await watchPage(context);
+  await context.route("https://api.anthropic.com/**", (route) =>
+    route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({ error: { message: "Overloaded, try again" } }),
+    }),
+  );
+  await setKey(worker, "anthropic", "sk-ant-test");
+
+  await page.evaluate((line) => window.showCaption(line), LINE);
+  await lookup(worker);
+  await page.getByRole("button", { name: "run", exact: true }).click();
+  await page.locator(ASK).click();
+
+  const card = page.locator("#vocab-meaning");
+  // What the dictionary gave is still there; the failure is a note under it.
+  await expect(card.locator(".definition").first()).toHaveText(MEANING);
+  await expect(card.locator(".phonetic")).toHaveText("/rʌn/");
+  // The provider said why, and saying "500" instead would have thrown that away.
+  await expect(card.locator(".note")).toContainText("Overloaded, try again");
+  await expect(page.locator(ASK)).toBeEnabled();
+});
+
+test("says so when the model answers with something unusable", async ({
+  context,
+  worker,
+}) => {
+  const page = await watchPage(context);
+  await context.route("https://api.anthropic.com/**", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      // Valid JSON, no definition: a truncated answer looks exactly like this, and it
+      // used to reach the card as the word "undefined".
+      body: JSON.stringify({
+        content: [{ type: "text", text: '{"partOfSpeech":"verb"}' }],
+      }),
+    }),
+  );
+  await setKey(worker, "anthropic", "sk-ant-test");
+
+  await page.evaluate((line) => window.showCaption(line), LINE);
+  await lookup(worker);
+  await page.getByRole("button", { name: "run", exact: true }).click();
+  await page.locator(ASK).click();
+
+  await expect(page.locator("#vocab-meaning .note")).toContainText(
+    "Claude answered without a definition.",
+  );
+  await expect(page.locator("#vocab-meaning")).not.toContainText("undefined");
+});
+
+test("says so when the provider rejects the key", async ({
+  context,
+  worker,
+}) => {
+  const page = await watchPage(context);
+  await context.route("https://api.anthropic.com/**", (route) =>
+    route.fulfill({ status: 401, contentType: "application/json", body: "{}" }),
+  );
+  await setKey(worker, "anthropic", "sk-ant-wrong");
+
+  await page.evaluate((line) => window.showCaption(line), LINE);
+  await lookup(worker);
+  await page.getByRole("button", { name: "run", exact: true }).click();
+  await page.locator(ASK).click();
+
+  await expect(page.locator("#vocab-meaning")).toContainText(
+    "Claude rejected the key.",
+  );
+});

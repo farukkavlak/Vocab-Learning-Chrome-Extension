@@ -67,13 +67,8 @@ test("looks a word up once and then reads it from the cache", async ({
   context,
   worker,
 }) => {
-  const page = await watchPage(context);
   const lookups: string[] = [];
-  page.on("request", (request) => {
-    if (/\/entries\/en\//.test(request.url())) {
-      lookups.push(request.url());
-    }
-  });
+  const page = await watchPage(context, { onLookup: (w) => lookups.push(w) });
 
   await page.evaluate((line) => window.showCaption(line), LINE);
   await lookup(worker);

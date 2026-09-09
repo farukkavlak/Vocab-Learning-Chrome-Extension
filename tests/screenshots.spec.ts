@@ -90,6 +90,64 @@ test("@shots design shots (caption raised so the whole panel is visible)", async
   await page.close();
 });
 
+test("@shots the model's answer, asked for from the card", async ({
+  context,
+  worker,
+}) => {
+  const page = await open(context, 260);
+  await context.route("https://api.anthropic.com/**", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              definition:
+                "without anyone helping him, for the whole of that year",
+              partOfSpeech: "adverb",
+              cefr: "A2",
+              phrase: "",
+            }),
+          },
+        ],
+      }),
+    }),
+  );
+  await worker.evaluate(() =>
+    chrome.storage.local.set({
+      "key anthropic": "sk-test",
+      provider: "anthropic",
+    }),
+  );
+
+  await lookup(worker);
+  const word = page.getByRole("button", { name: "alone", exact: true });
+  await word.click();
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: `${OUT}/9-ask.png` });
+
+  await page.locator("#vocab-meaning .ask").click();
+  await page.waitForTimeout(600);
+
+  const box = await page.locator("#vocab-panel").boundingBox();
+  const m = await page.locator("#vocab-meaning").boundingBox();
+  if (box && m) {
+    const x = Math.min(box.x, m.x) - 30;
+    const y = Math.min(box.y, m.y) - 30;
+    await page.screenshot({
+      path: `${OUT}/10-model.png`,
+      clip: {
+        x,
+        y,
+        width: Math.max(box.x + box.width, m.x + m.width) - x + 30,
+        height: Math.max(box.y + box.height, m.y + m.height) - y + 30,
+      },
+    });
+  }
+  await page.close();
+});
+
 test("@shots a caption the player broke into two lines", async ({
   context,
   worker,

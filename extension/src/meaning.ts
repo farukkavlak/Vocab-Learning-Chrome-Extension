@@ -16,10 +16,14 @@ export interface Meaning {
   translation?: string;
 }
 
-export interface MeaningProvider {
+/** Enough of a provider to key its answers by. */
+export interface Cacheable {
   readonly id: string;
   /** Whether the answer depends on the line, and so whether the cache is keyed by it. */
   readonly usesSentence: boolean;
+}
+
+export interface MeaningProvider extends Cacheable {
   lookup(word: string, sentence: string): Promise<Meaning>;
 }
 

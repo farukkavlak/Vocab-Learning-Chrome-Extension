@@ -227,8 +227,12 @@ So the panel opens with the dictionary and offers the model as a second step:
 
 - [x] `DictionaryApiProvider` — no key, free, the default. Fills `partOfSpeech`,
       `senses`, `example`, `phonetic` and `audio`.
-- [ ] A control on the card — "in this sentence" — that asks `LlmProvider` with the whole
-      line and replaces the body. Current SDK, current model, structured output.
+- [x] A control on the card — "In this sentence" — that asks the model with the whole
+      line and replaces the senses, keeping the pronunciation the dictionary gave.
+- [x] Providers are a registry like `sources/`: `llm.ts` holds the prompt, the schema and
+      the request; `anthropic.ts` and `openai.ts` are a dozen lines each. Unlike a caption
+      source, which recognises its own page, the reader chooses this one — whichever key
+      they entered.
 - [x] Cache in `chrome.storage.local`. Keyed by (provider, word), plus the sentence only
       for a provider that reads it — the dictionary answers the same wherever the word
       was met, so keying its answer by sentence would miss every hit.
@@ -280,10 +284,37 @@ no provider supplies all of it, and the card draws what it is given.
 stay short for easy words. Both come from the model only. `translation` stays in the type
 but out of the default card — this audience is here to stay in English.
 
+**Decided while building it.**
+
+- **Lookups run in the background worker, not the content script.** Its requests carry
+  the extension's host permissions, so each provider's CORS policy stops mattering —
+  measured on 2026-09-09: a page-origin preflight to `api.anthropic.com` is refused
+  unless `anthropic-dangerous-direct-browser-access` is set, while the same request from
+  the worker reaches the server without it. It also means an API key never enters a
+  script that shares a page with the site.
+- **Raw `fetch`, not each vendor's SDK.** Anthropic's own guidance prefers the official
+  SDK; the multi-provider design outweighs it here. One shared transport keeps the two
+  adapters the same shape and the worker bundle at 8 KB — the Anthropic SDK alone
+  unpacks to 9 MB. The cost is updating two request shapes by hand if an API changes.
+- **`claude-haiku-4-5` and `gpt-4o-mini` as defaults.** A subtitle word is a small
+  question; the settings page will let either be changed.
+- **Keys in `storage.local`, one per provider.** `sync` would carry them to Google's
+  servers. A reader who has pasted a single key has already chosen their provider, so
+  nothing asks them to pick as well.
+
 ### Phase 7 — `feat/settings`
 
 - [ ] Extension popup: API key for the model, and an optional target language (off by
-      default — see Phase 6)
+      default — see Phase 6). It is the only way to enter a key, so until it lands the
+      card leaves the model step out rather than pointing at settings that do not exist.
+- [ ] Move the provider hosts to `optional_host_permissions` and call
+      `chrome.permissions.request()` next to the key field. They are unconditional in the
+      manifest today, so a keyless install is asked for access to two vendors' APIs it
+      will never call — but the request needs a user gesture on an extension page, which
+      is this phase.
+- [ ] Each provider needs a `label` and a link to where its key is issued. Both were
+      written in Phase 6 and removed again: nothing read them, and a field kept for a
+      later phase is the kind of thing that rots.
 - [ ] Persist in `chrome.storage.sync`
 - [ ] Link to `chrome://extensions/shortcuts` from the popup. `suggested_key` is only a
       suggestion: if the combination is already taken the browser drops it silently and

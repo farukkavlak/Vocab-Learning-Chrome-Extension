@@ -1,5 +1,12 @@
 import { CaptionBuffer } from "./buffer";
-import { closeOverlays, isPanelOpen, openPanel } from "./panel";
+import {
+  closeMeaning,
+  closeOverlays,
+  isInsidePanel,
+  isMeaningOpen,
+  isPanelOpen,
+  openPanel,
+} from "./panel";
 import { sourceFor } from "./sources";
 
 interface LookupMessage {
@@ -12,13 +19,30 @@ if (source) {
   const buffer = new CaptionBuffer();
   source.attach((line) => buffer.push(line));
 
-  const resume = (): void => {
-    void source.getVideo()?.play();
+  // Only what we paused do we start again: the user may have paused the video
+  // themselves before asking for a lookup, and resuming it then would be a surprise.
+  let paused: HTMLVideoElement | null = null;
+
+  const stopWatchingPlayback = (): void => {
+    paused?.removeEventListener("play", onPlay);
+    paused = null;
   };
 
-  const dismiss = (): void => {
+  /**
+   * The user can resume the video in ways this extension never hears about: the player's
+   * own button, Space, a double click. Whichever it is, the panel has to get out of the
+   * way — otherwise the video plays on behind a frozen panel with its captions hidden.
+   */
+  function onPlay(): void {
+    stopWatchingPlayback();
     closeOverlays();
-    resume();
+  }
+
+  const dismiss = (): void => {
+    const video = paused;
+    stopWatchingPlayback();
+    closeOverlays();
+    void video?.play();
   };
 
   /**
@@ -41,8 +65,44 @@ if (source) {
     return lines.length > 1 ? { text, previous: lines[0] } : { text };
   };
 
+  const open = (): void => {
+    const lines = linesToShow();
+    if (!lines) {
+      return;
+    }
+
+    const video = source.getVideo();
+    if (video && !video.paused) {
+      video.pause();
+      video.addEventListener("play", onPlay);
+      paused = video;
+    }
+
+    openPanel({
+      ...lines,
+      captionRect: source.getCaptionRect(),
+      captionElement: source.getCaptionElement(),
+      captionFontSize: source.getCaptionFontSize(),
+    });
+  };
+
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
+    if (event.key !== "Escape" || !isPanelOpen()) {
+      return;
+    }
+
+    // One step at a time: the card first, then the panel.
+    if (isMeaningOpen()) {
+      closeMeaning();
+      return;
+    }
+
+    dismiss();
+  });
+
+  // Clicking away is how every overlay is dismissed; the panel should be no different.
+  document.addEventListener("click", (event) => {
+    if (isPanelOpen() && !isInsidePanel(event.target)) {
       dismiss();
     }
   });
@@ -58,16 +118,6 @@ if (source) {
       return;
     }
 
-    const lines = linesToShow();
-    if (!lines) {
-      return;
-    }
-
-    source.getVideo()?.pause();
-    openPanel({
-      ...lines,
-      captionRect: source.getCaptionRect(),
-      captionElement: source.getCaptionElement(),
-    });
+    open();
   });
 }

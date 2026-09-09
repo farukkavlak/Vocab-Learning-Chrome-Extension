@@ -18,7 +18,8 @@
     "format:check": "prettier --check .",
     "prepare": "husky",
     "test": "playwright test",
-    "test:live": "LIVE=1 playwright test youtube-live"
+    "test:live": "LIVE=1 playwright test youtube-live",
+    "shots": "SHOTS=1 playwright test screenshots"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

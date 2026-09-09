@@ -104,6 +104,8 @@ Playwright drives a real Chromium with the built extension loaded.
   multi-segment joining, word filtering, pause and resume.
 - `npm run test:live` — hits the real youtube.com and asserts only that the DOM contract
   still holds (caption container, subtitles button, a non-empty caption tracklist).
+- `npm run shots` — writes PNGs of the panel to `shots/`. Asserts nothing; it exists
+  because the layout defects above were invisible in the test output.
 
 Two things this cannot cover, and a human has to check once per platform (both were
 verified by hand on YouTube on 2026-09-09: the panel showed the words of the line that
@@ -154,6 +156,39 @@ Decided while building it: the panel takes the caption's place rather than openi
 elsewhere, so the eye never moves; the meaning opens under the clicked word, flipping
 above it when there is no room below, which near the bottom of the screen is most of the
 time; the previous line sits above as plain text, for context but not clickable.
+
+### Phase 5b — polish
+
+The first pass was drawn against a fixture and never looked at. Screenshots of the built
+extension (`npm run shots`) showed what reading the code had not:
+
+- [x] The panel grew downwards from the caption's top, so in a short window it ran off
+      the bottom of the screen. It is anchored by its own line of words now, which is
+      lined up on the caption's centre; the box grows upwards from there.
+- [x] The words were chips in a row, which read as a tag cloud rather than a sentence.
+      Every token is rendered now — punctuation, numbers and one-letter words as plain
+      text — and only the words worth a lookup are buttons, marked on hover alone. The
+      lookup still uses the bare word.
+- [x] The panel used a fixed 19px. It takes the caption's own computed size now, so it
+      matches in a small window and in fullscreen; the card's prose is scaled from it
+      but bounded, since prose set at caption size is unreadable.
+- [x] Its width was the caption's times 1.15. The extra room a line needs is its words'
+      hover padding, which follows the word count, not the caption's width; past that it
+      wraps where the caption did, and never spans more than 92% of the window.
+- [x] The meaning card was white on a dark video and covered the rest of the sentence.
+      It is dark now, points at its word with an arrow, and clears the whole line —
+      the sentence is the context the meaning is read in.
+- [x] The card already lays out the Phase 6 schema (part of speech, CEFR, phrase,
+      translation), so that phase only has to supply the data.
+- [x] Esc closes the card first and the panel second; the panel takes focus so the arrow
+      keys walk the line without tabbing into the shadow root.
+
+**Resuming.** The shortcut and Esc were the only ways back to the video, so pressing the
+player's own play button left the video running behind a frozen panel with the real
+captions still hidden. The content script listens for the video's `play` event now:
+however the user starts it — Space, the player, a double click — the panel gets out of
+the way. Clicking outside it dismisses it too, and a video that was already paused before
+the lookup is left paused, since resuming it would be a decision the user never made.
 
 ### Phase 6 — `refactor/meaning-provider`
 

@@ -66,6 +66,18 @@ export function domCaptionSource(
       return { top, left, width: right - left, height: bottom - top };
     },
 
+    getCaptionFontSize(): number | null {
+      const container = findContainer();
+      const element =
+        container?.querySelector(options.segmentSelector) ?? container;
+      if (!element) {
+        return null;
+      }
+
+      const size = parseFloat(getComputedStyle(element).fontSize);
+      return Number.isFinite(size) && size > 0 ? size : null;
+    },
+
     matches: (url) => hostMatchers.some((matcher) => matcher.test(url)),
 
     readCurrent() {

@@ -89,7 +89,7 @@ test("joins multi-segment captions with spaces", async ({
   ]);
 });
 
-test("strips surrounding punctuation and skips numbers and short words", async ({
+test("keeps punctuation on screen but looks up the bare word", async ({
   context,
   worker,
 }) => {
@@ -101,13 +101,23 @@ test("strips surrounding punctuation and skips numbers and short words", async (
   );
   await lookup(worker);
 
+  // The line has to read as the sentence it replaces, so the clickable words carry
+  // their own punctuation. Numbers and one-letter words are not worth a lookup and
+  // stay as plain text.
   await expect(page.locator("#vocab-panel .word")).toHaveText([
-    "Wait",
+    '"Wait,"',
     "he",
     "said",
-    "times",
-    "lot",
+    "times,",
+    "lot.",
   ]);
+  await expect(page.locator("#vocab-panel .line")).toHaveText(
+    '"Wait," he said — 42 times, a lot.',
+  );
+
+  const request = page.waitForRequest(/localhost:3000/);
+  await page.locator("#vocab-panel .word").last().click();
+  expect(new URL((await request).url()).searchParams.get("input")).toBe("lot");
 });
 
 test("Escape closes the panel and resumes the video", async ({

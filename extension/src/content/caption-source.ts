@@ -27,5 +27,10 @@ export interface CaptionSource {
    * bounds say where the words are on screen.
    */
   getCaptionRect(): Rect | null;
+  /**
+   * The caption's rendered font size in px. Players scale captions with the window and
+   * with fullscreen, so the panel has to read it rather than pick a size of its own.
+   */
+  getCaptionFontSize(): number | null;
   getVideo(): HTMLVideoElement | null;
 }

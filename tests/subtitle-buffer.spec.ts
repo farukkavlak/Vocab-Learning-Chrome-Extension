@@ -35,7 +35,7 @@ test("shows the words of the caption that is on screen, and pauses the video", a
   );
   await lookup(worker);
 
-  const words = page.locator("#vocab-container button");
+  const words = page.locator("#vocab-panel .word");
   await expect(words).toHaveText([
     "He",
     "had",
@@ -61,7 +61,7 @@ test("falls back to the last buffered line when the caption is already gone", as
 
   await lookup(worker);
 
-  await expect(page.locator("#vocab-container button")).toHaveText([
+  await expect(page.locator("#vocab-panel .word")).toHaveText([
     "the",
     "second",
     "line",
@@ -80,7 +80,7 @@ test("joins multi-segment captions with spaces", async ({
   );
   await lookup(worker);
 
-  await expect(page.locator("#vocab-container button")).toHaveText([
+  await expect(page.locator("#vocab-panel .word")).toHaveText([
     "run",
     "the",
     "whole",
@@ -101,7 +101,7 @@ test("strips surrounding punctuation and skips numbers and short words", async (
   );
   await lookup(worker);
 
-  await expect(page.locator("#vocab-container button")).toHaveText([
+  await expect(page.locator("#vocab-panel .word")).toHaveText([
     "Wait",
     "he",
     "said",
@@ -123,11 +123,11 @@ test("Escape closes the panel and resumes the video", async ({
 
   await page.evaluate(() => window.showCaption(["run the department"]));
   await lookup(worker);
-  await expect(page.locator("#vocab-container")).toBeVisible();
+  await expect(page.locator("#vocab-panel")).toBeVisible();
 
   await page.keyboard.press("Escape");
 
-  await expect(page.locator("#vocab-container")).toHaveCount(0);
+  await expect(page.locator("#vocab-panel")).toHaveCount(0);
   await expect
     .poll(() => page.evaluate(() => window.player.paused))
     .toBe(false);

@@ -10,6 +10,22 @@
     width: 640px;
     height: 360px;
   }
+  /* Faithful to real players: the caption container is a layer covering the whole
+     video, and the caption window inside it sits near the bottom. Positioning the
+     panel from the container would put it at the top of the screen. */
+  .player-timedtext {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+  }
+  .caption-window {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 40px;
+    text-align: center;
+    color: #fff;
+  }
 </style>
 
 <!--

@@ -39,7 +39,7 @@ test("shows the meaning returned by the server", async ({
 
   await page.getByRole("button", { name: "run", exact: true }).click();
 
-  await expect(page.locator("#boxAlert")).toContainText(
+  await expect(page.locator("#vocab-meaning")).toContainText(
     "to manage or be in charge of something",
   );
 });
@@ -59,7 +59,7 @@ test("says so when the lookup fails instead of failing silently", async ({
 
   await page.getByRole("button", { name: "run", exact: true }).click();
 
-  await expect(page.locator("#boxAlert")).toContainText(
+  await expect(page.locator("#vocab-meaning")).toContainText(
     'Could not look up "run"',
   );
 });
@@ -79,11 +79,11 @@ test("Escape also dismisses the result box", async ({ context, worker }) => {
   );
   await lookup(worker);
   await page.getByRole("button", { name: "run", exact: true }).click();
-  await expect(page.locator("#boxAlert")).toBeVisible();
+  await expect(page.locator("#vocab-meaning")).toBeVisible();
 
   await page.keyboard.press("Escape");
 
-  await expect(page.locator("#boxAlert")).toHaveCount(0);
+  await expect(page.locator("#vocab-meaning")).toHaveCount(0);
   await expect
     .poll(() => page.evaluate(() => window.player.paused))
     .toBe(false);

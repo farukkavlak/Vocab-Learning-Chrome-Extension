@@ -23,4 +23,9 @@ export class CaptionBuffer {
   get last(): CaptionLine | null {
     return this.lines[this.lines.length - 1] ?? null;
   }
+
+  /** The most recent `count` lines, oldest first. */
+  recent(count: number): CaptionLine[] {
+    return this.lines.slice(-count);
+  }
 }

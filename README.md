@@ -4,7 +4,7 @@
 <br />
 <div align="center">
   <a>
-    <img src="https://github.com/farukkavlak/Vocab-Learning-Chrome-Extension/blob/main/extension/public/logo.png" alt="Logo" width="180" height="180">
+    <img src="https://github.com/farukkavlak/vocabboost/blob/main/extension/public/logo.png" alt="Logo" width="180" height="180">
   </a>
 
 <h3 align="center">VocabBoost</h3>
@@ -14,9 +14,9 @@
     <br>
     <a href="#usage">Screenshots</a>
     ·
-    <a href="https://github.com/farukkavlak/Vocab-Learning-Chrome-Extension/issues">Report Bug</a>
+    <a href="https://github.com/farukkavlak/vocabboost/issues">Report Bug</a>
     ·
-    <a href="https://github.com/farukkavlak/Vocab-Learning-Chrome-Extension/issues">Request Feature</a>
+    <a href="https://github.com/farukkavlak/vocabboost/issues">Request Feature</a>
   </p>
 </div>
 
@@ -77,7 +77,7 @@ To get a local copy up and running follow these simple example steps.
 2. Get a API Key at [https://cloud.google.com/vision](https://cloud.google.com/vision/docs/before-you-begin)
 3. Clone the repo
    ```sh
-   git clone https://github.com/farukkavlak/Vocab-Learning-Chrome-Extension.git
+   git clone https://github.com/farukkavlak/vocabboost.git
    ```
 4. There are two folder in project such as Extension and Server
 5. Install NPM packages in the server
@@ -109,13 +109,13 @@ To use the extension, just press the extension's shortcut while watching a movie
 Screenshots are black because of the Netflix Privacy Issues
 <div align="center">
   <a>
-    <img src="https://github.com/farukkavlak/Vocab-Learning-Chrome-Extension/blob/main/screenshots/usage-1.png" alt="usage-1">
+    <img src="https://github.com/farukkavlak/vocabboost/blob/main/screenshots/usage-1.png" alt="usage-1">
   </a>
 </div>
 <br>
 <div align="center">
   <a>
-    <img src="https://github.com/farukkavlak/Vocab-Learning-Chrome-Extension/blob/main/screenshots/usage-2.png" alt="usage-2">
+    <img src="https://github.com/farukkavlak/vocabboost/blob/main/screenshots/usage-2.png" alt="usage-2">
   </a>
 </div>
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

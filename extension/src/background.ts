@@ -12,8 +12,10 @@ chrome.commands.onCommand.addListener((command) => {
       return;
     }
 
-    // The content script is declared statically in the manifest, so it is already
-    // running on any tab this command can reach.
-    await chrome.tabs.sendMessage(tab.id, { type: "LOOKUP_SUBTITLE" });
+    // Throws when nothing is listening: the tab is not a supported platform, or its
+    // content script was orphaned by reloading the extension and needs a page refresh.
+    await chrome.tabs
+      .sendMessage(tab.id, { type: "LOOKUP_SUBTITLE" })
+      .catch(() => undefined);
   })();
 });

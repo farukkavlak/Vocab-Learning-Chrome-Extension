@@ -1,4 +1,4 @@
-import type { CaptionSource } from "../caption-source";
+import type { CaptionSource, Rect } from "../caption-source";
 import { matchPatternToRegExp } from "./match-pattern";
 
 const CONTAINER_POLL_MS = 1000;
@@ -22,7 +22,7 @@ export function domCaptionSource(
   const getVideo = (): HTMLVideoElement | null =>
     document.querySelector("video");
 
-  const findContainer = (): Element | null =>
+  const findContainer = (): HTMLElement | null =>
     document.querySelector(options.containerSelector);
 
   const readCaption = (container: Element): string => {
@@ -40,6 +40,31 @@ export function domCaptionSource(
     id: options.id,
     hostPatterns: options.hostPatterns,
     getVideo,
+    getCaptionElement: findContainer,
+
+    getCaptionRect(): Rect | null {
+      const container = findContainer();
+      if (!container) {
+        return null;
+      }
+
+      const elements = [...container.querySelectorAll(options.segmentSelector)];
+      const rects = (elements.length > 0 ? elements : [container])
+        .map((element) => element.getBoundingClientRect())
+        .filter((rect) => rect.width > 0 && rect.height > 0);
+
+      const first = rects[0];
+      if (!first) {
+        return null;
+      }
+
+      const top = Math.min(...rects.map((rect) => rect.top));
+      const left = Math.min(...rects.map((rect) => rect.left));
+      const right = Math.max(...rects.map((rect) => rect.right));
+      const bottom = Math.max(...rects.map((rect) => rect.bottom));
+
+      return { top, left, width: right - left, height: bottom - top };
+    },
 
     matches: (url) => hostMatchers.some((matcher) => matcher.test(url)),
 

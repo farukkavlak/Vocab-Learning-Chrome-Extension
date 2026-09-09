@@ -1,5 +1,5 @@
 import { CaptionBuffer } from "./buffer";
-import { closeOverlays, openPanel } from "./panel";
+import { closeOverlays, isPanelOpen, openPanel } from "./panel";
 import { sourceFor } from "./sources";
 
 interface LookupMessage {
@@ -21,6 +21,26 @@ if (source) {
     resume();
   };
 
+  /**
+   * The line the user is reacting to plus the one before it. Reads what is on screen,
+   * falling back to the buffer when the caption has already been cleared.
+   */
+  const linesToShow = (): { text: string; previous?: string } | null => {
+    const onScreen = source.readCurrent();
+    const recent = buffer.recent(2).map((line) => line.text);
+    const lines =
+      onScreen && recent[recent.length - 1] !== onScreen
+        ? [...recent.slice(-1), onScreen]
+        : recent;
+
+    const text = lines[lines.length - 1];
+    if (!text) {
+      return null;
+    }
+
+    return lines.length > 1 ? { text, previous: lines[0] } : { text };
+  };
+
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       dismiss();
@@ -32,13 +52,22 @@ if (source) {
       return;
     }
 
-    // Whatever is on screen, or the last line seen if the caption has already cleared.
-    const text = source.readCurrent() || buffer.last?.text;
-    if (!text) {
+    // The shortcut toggles: pressing it again puts the video back.
+    if (isPanelOpen()) {
+      dismiss();
+      return;
+    }
+
+    const lines = linesToShow();
+    if (!lines) {
       return;
     }
 
     source.getVideo()?.pause();
-    openPanel(text, resume);
+    openPanel({
+      ...lines,
+      captionRect: source.getCaptionRect(),
+      captionElement: source.getCaptionElement(),
+    });
   });
 }

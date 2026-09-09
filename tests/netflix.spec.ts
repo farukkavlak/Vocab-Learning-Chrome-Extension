@@ -29,7 +29,7 @@ test("the netflix adapter reads captions from its own container", async ({
   );
   await lookup(worker);
 
-  await expect(page.locator("#vocab-container button")).toHaveText([
+  await expect(page.locator("#vocab-panel .word")).toHaveText([
     "he",
     "had",
     "to",

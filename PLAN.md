@@ -36,7 +36,7 @@ Four things are wrong with that, and they are the reason for this rewrite:
 - [x] `chrome.runtime.onMessage.removeListener(arguments.callee)` inside a `.then`
       callback targets the wrong listener and throws in strict mode — dead line
 - [x] `content.js` builds a `buttons` array that is never read
-- [ ] Every style is inline in `content.js`; there is no stylesheet
+- [x] Every style is inline in `content.js`; there is no stylesheet
 - [x] Two `.gitignore` files (root and `server/`) that mostly duplicate each other
 - [x] `server/` depends on `nodemon` as a production dependency
 - [ ] `AnswerFormat.js` exists only to patch up leading/trailing punctuation in free-text
@@ -145,13 +145,15 @@ adapter mechanism against a fixture, not that `.player-timedtext` is still corre
 
 ### Phase 5 — `feat/overlay`
 
-- [ ] Remove the `window.alert` override (`createCustomAlert`) and every inline style
-- [ ] A real stylesheet, injected in a shadow root so the host page cannot bleed into it
-- [ ] Own panel: shortcut → pause → split the buffered line into clickable words → show
+- [x] Remove the `window.alert` override (`createCustomAlert`) and every inline style
+- [x] A real stylesheet, injected in a shadow root so the host page cannot bleed into it
+- [x] Own panel: shortcut → pause → split the buffered line into clickable words → show
       the previous line dimmed above → Esc or close → resume
 
-This is the visible face of the project and the weakest part of the old version. Worth
-spending real time on.
+Decided while building it: the panel takes the caption's place rather than opening
+elsewhere, so the eye never moves; the meaning opens under the clicked word, flipping
+above it when there is no room below, which near the bottom of the screen is most of the
+time; the previous line sits above as plain text, for context but not clickable.
 
 ### Phase 6 — `refactor/meaning-provider`
 

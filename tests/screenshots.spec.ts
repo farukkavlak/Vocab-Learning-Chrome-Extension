@@ -90,6 +90,16 @@ test("@shots design shots (caption raised so the whole panel is visible)", async
   await page.close();
 });
 
+test("@shots the settings page", async ({ context, worker }) => {
+  const id = new URL(worker.url()).host;
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 328, height: 400 });
+  await page.goto(`chrome-extension://${id}/settings.html`);
+  await page.locator("#key").fill("sk-ant-api03-x7Kd92mQpLvR4tYn");
+  await page.screenshot({ path: `${OUT}/11-settings.png` });
+  await page.close();
+});
+
 test("@shots the model's answer, asked for from the card", async ({
   context,
   worker,

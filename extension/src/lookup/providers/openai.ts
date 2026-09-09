@@ -6,6 +6,7 @@ interface Response {
 
 export const openai = llmProvider({
   id: "openai",
+  keyUrl: "https://platform.openai.com/api-keys",
   label: "OpenAI",
   model: "gpt-4o-mini",
   endpoint: "https://api.openai.com/v1/chat/completions",

@@ -2,6 +2,8 @@
 // service worker. Neither is typed by anything else in the repo.
 declare global {
   interface Window {
+    /** Origins the settings page asked for, recorded by the stub in settings.spec. */
+    asked: string[];
     player: HTMLVideoElement;
     showCaption: (segments: string[]) => void;
     clearCaption: () => void;

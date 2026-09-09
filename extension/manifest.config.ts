@@ -1,3 +1,4 @@
+import { llmProviders } from "./src/lookup/providers";
 import { sources } from "./src/content/sources";
 
 // The single place platforms are declared: adding an adapter updates the manifest too.
@@ -11,12 +12,10 @@ export default {
   description:
     "Look up a word from the subtitles without leaving the video, and hear how it sounds.",
   permissions: ["storage"],
-  host_permissions: [
-    ...matches,
-    "https://api.dictionaryapi.dev/*",
-    "https://api.anthropic.com/*",
-    "https://api.openai.com/*",
-  ],
+  host_permissions: [...matches, "https://api.dictionaryapi.dev/*"],
+  // Asked for beside the key field: an install with no key never calls these.
+  optional_host_permissions: llmProviders.map((provider) => provider.origin),
+  action: { default_popup: "settings.html" },
   background: {
     service_worker: "background.js",
   },

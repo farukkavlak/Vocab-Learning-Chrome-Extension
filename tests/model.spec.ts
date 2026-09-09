@@ -11,10 +11,18 @@ const ANSWER = {
   phrase: "",
 };
 
+/**
+ * The key lives in local storage and the choice of provider in sync, as the settings
+ * page writes them. The provider's host permission is not granted here: a routed
+ * request is fulfilled before Chrome checks for it — which is why the settings page's
+ * own request has a test of its own.
+ */
 async function setKey(worker: Worker, id: string, key: string): Promise<void> {
   await worker.evaluate(
-    async ([name, value]) =>
-      chrome.storage.local.set({ [`key ${name}`]: value, provider: name }),
+    async ([name, value]) => {
+      await chrome.storage.local.set({ [`key ${name}`]: value });
+      await chrome.storage.sync.set({ provider: name });
+    },
     [id, key],
   );
 }
@@ -200,6 +208,48 @@ test("says so when the model answers with something unusable", async ({
     "Claude answered without a definition.",
   );
   await expect(page.locator("#vocab-meaning")).not.toContainText("undefined");
+});
+
+test("asks for a translation only when one was chosen", async ({
+  context,
+  worker,
+}) => {
+  const bodies: string[] = [];
+  const page = await watchPage(context);
+  await context.route("https://api.anthropic.com/**", (route) => {
+    bodies.push(route.request().postData() ?? "");
+    return route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ ...ANSWER, translation: "yönetmek" }),
+          },
+        ],
+      }),
+    });
+  });
+  await setKey(worker, "anthropic", "sk-ant-test");
+  await worker.evaluate(() => chrome.storage.sync.set({ language: "Turkish" }));
+
+  await page.evaluate((line) => window.showCaption(line), LINE);
+  await lookup(worker);
+  await page.getByRole("button", { name: "run", exact: true }).click();
+  await page.locator(ASK).click();
+
+  await expect(page.locator("#vocab-meaning .translation")).toHaveText(
+    "yönetmek",
+  );
+
+  const sent = JSON.parse(bodies[0] ?? "{}") as {
+    messages: { content: string }[];
+    output_config: { format: { schema: { properties: object } } };
+  };
+  expect(sent.messages[0]?.content).toContain("into Turkish");
+  expect(sent.output_config.format.schema.properties).toHaveProperty(
+    "translation",
+  );
 });
 
 test("says so when the provider rejects the key", async ({

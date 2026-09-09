@@ -6,6 +6,7 @@ interface Response {
 
 export const anthropic = llmProvider({
   id: "anthropic",
+  keyUrl: "https://console.anthropic.com/settings/keys",
   label: "Claude",
   // Cheapest and fastest of the family: a subtitle word is a small question.
   model: "claude-haiku-4-5",

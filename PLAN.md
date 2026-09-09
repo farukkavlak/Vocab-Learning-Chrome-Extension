@@ -123,6 +123,15 @@ was on screen, and the buffer served the previous line after the caption had cle
 2. **The keyboard shortcut.** `chrome.commands` shortcuts are registered by the browser
    and cannot be triggered from Playwright, so tests send `LOOKUP_SUBTITLE` to the
    content script directly and the wiring in `background.ts` is untested.
+3. **Granting an optional host permission.** Chrome asks for it in its own bubble, which
+   Playwright cannot click, so `chrome.permissions.request` is stubbed in the settings
+   tests. The permission is genuinely enforced — a worker `fetch` to an ungranted origin
+   fails, measured on 2026-09-09 — but a routed request is fulfilled before Chrome checks
+   for it, so the model tests pass without it. What the suite proves is that the page
+   asks for the right origin and refuses to save a key when access is denied.
+4. **A live call to a model provider.** Both are stubbed. The request shape follows the
+   current API documentation, but one real call with a real key should be made by hand
+   before release.
 
 ### Phase 4 — `refactor/caption-port`
 
@@ -304,22 +313,26 @@ but out of the default card — this audience is here to stay in English.
 
 ### Phase 7 — `feat/settings`
 
-- [ ] Extension popup: API key for the model, and an optional target language (off by
-      default — see Phase 6). It is the only way to enter a key, so until it lands the
-      card leaves the model step out rather than pointing at settings that do not exist.
-- [ ] Move the provider hosts to `optional_host_permissions` and call
-      `chrome.permissions.request()` next to the key field. They are unconditional in the
-      manifest today, so a keyless install is asked for access to two vendors' APIs it
-      will never call — but the request needs a user gesture on an extension page, which
-      is this phase.
-- [ ] Each provider needs a `label` and a link to where its key is issued. Both were
-      written in Phase 6 and removed again: nothing read them, and a field kept for a
-      later phase is the kind of thing that rots.
-- [ ] Persist in `chrome.storage.sync`
-- [ ] Link to `chrome://extensions/shortcuts` from the popup. `suggested_key` is only a
-      suggestion: if the combination is already taken the browser drops it silently and
-      the command shows as "Not set", with no error anywhere. It was never assigned on
-      first install under Vivaldi, whose own shortcut set is far denser than Chrome's.
+- [x] Extension popup: the service first, then one key field, then an optional language.
+      It is the only way to enter a key, which is why the card left the model step out
+      until now.
+- [x] Provider hosts moved to `optional_host_permissions`, requested beside the key
+      field. A keyless install is no longer asked for access to two vendors' APIs it will
+      never call, and a key is not saved if access is refused — a key that cannot be used
+      would look configured and fail later.
+- [x] Each provider carries a `label` and a link to where its key is issued, both read by
+      the popup now. They were written in Phase 6 and removed again for want of a reader.
+- [x] Preferences (service, language) in `chrome.storage.sync`; keys in `storage.local`,
+      one per provider, so switching service does not throw the other key away.
+- [x] Link to `chrome://extensions/shortcuts` from the popup, opened with
+      `chrome.tabs.create` because a page cannot link to a `chrome://` URL.
+      `suggested_key` is only a suggestion: if the combination is already taken the
+      browser drops it silently and the command shows as "Not set", with no error
+      anywhere. It was never assigned on first install under Vivaldi, whose own shortcut
+      set is far denser than Chrome's.
+
+**A translation is asked for only when a language is set**, and then the prompt and the
+schema both grow the field. English stays the default, as Phase 6 settled.
 
 ### Phase 8 — `docs/readme`
 

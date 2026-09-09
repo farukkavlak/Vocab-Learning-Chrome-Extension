@@ -35,7 +35,10 @@ export async function explainWord(
     return cached;
   }
 
-  const meaning = await model.provider.lookup(word, sentence, model.key);
+  const meaning = await model.provider.lookup(word, sentence, {
+    key: model.key,
+    language: model.language || undefined,
+  });
   await writeCache(model.provider, word, sentence, meaning);
   return meaning;
 }

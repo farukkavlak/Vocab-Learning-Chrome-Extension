@@ -2,17 +2,25 @@ import { LookupError } from "../../meaning";
 import type { Cacheable, Meaning } from "../../meaning";
 
 /** The answer the model is asked for, and the shape every adapter constrains it to. */
-const SCHEMA = {
-  type: "object",
-  properties: {
+function schemaFor(language?: string): object {
+  const properties: Record<string, object> = {
     definition: { type: "string" },
     partOfSpeech: { type: "string" },
     cefr: { type: "string", enum: ["A1", "A2", "B1", "B2", "C1", "C2"] },
     phrase: { type: "string" },
-  },
-  required: ["definition", "partOfSpeech", "cefr", "phrase"],
-  additionalProperties: false,
-} as const;
+  };
+
+  if (language) {
+    properties.translation = { type: "string" };
+  }
+
+  return {
+    type: "object",
+    properties,
+    required: Object.keys(properties),
+    additionalProperties: false,
+  };
+}
 
 const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
 
@@ -43,6 +51,9 @@ function read(text: string, label: string): Meaning {
     ...(typeof answer.phrase === "string" && answer.phrase
       ? { phrase: answer.phrase }
       : {}),
+    ...(typeof answer.translation === "string" && answer.translation
+      ? { translation: answer.translation }
+      : {}),
   };
 }
 
@@ -57,30 +68,45 @@ function reason(body: string): string | undefined {
   }
 }
 
-function prompt(word: string, sentence: string): string {
+function prompt(word: string, sentence: string, language?: string): string {
   return [
     `In the subtitle line "${sentence}", what does "${word}" mean?`,
     "Define it as it is used in that line, in one sentence of plain English,",
     "for someone learning English who is staying inside English.",
     'If the word belongs to a phrasal verb or idiom, set "phrase" to that whole',
-    'expression; otherwise set it to "". Do not translate.',
+    'expression; otherwise set it to "".',
+    language
+      ? `Also translate the word, as used in that line, into ${language}.`
+      : "Do not translate.",
   ].join(" ");
 }
 
 export interface LlmConfig {
   id: string;
-  /** Shown in the settings page and on the card. */
+  /** Shown in the settings page, and in anything the provider has to be named in. */
   label: string;
+  /** Where the reader gets a key, linked from the settings page. */
+  keyUrl: string;
   model: string;
   endpoint: string;
   headers(key: string): Record<string, string>;
-  body(text: string, model: string, schema: typeof SCHEMA): unknown;
+  body(text: string, model: string, schema: object): unknown;
   /** The JSON document the model produced, still as text. */
   extract(payload: unknown): string | undefined;
 }
 
+export interface Ask {
+  key: string;
+  /** Set only when the reader asked for a translation as well. */
+  language?: string | undefined;
+}
+
 export interface LlmProvider extends Cacheable {
-  lookup(word: string, sentence: string, key: string): Promise<Meaning>;
+  readonly label: string;
+  readonly keyUrl: string;
+  /** The host to ask permission for, and to declare in the manifest. */
+  readonly origin: string;
+  lookup(word: string, sentence: string, ask: Ask): Promise<Meaning>;
 }
 
 /**
@@ -91,18 +117,21 @@ export interface LlmProvider extends Cacheable {
 export function llmProvider(config: LlmConfig): LlmProvider {
   return {
     id: config.id,
+    label: config.label,
+    keyUrl: config.keyUrl,
+    origin: `${new URL(config.endpoint).origin}/*`,
     usesSentence: true,
 
-    async lookup(word: string, sentence: string, key: string) {
-      if (!key) {
-        throw new LookupError(`Add a ${config.label} key in the settings.`);
-      }
-
+    async lookup(word: string, sentence: string, { key, language }: Ask) {
       const response = await fetch(config.endpoint, {
         method: "POST",
         headers: { "content-type": "application/json", ...config.headers(key) },
         body: JSON.stringify(
-          config.body(prompt(word, sentence), config.model, SCHEMA),
+          config.body(
+            prompt(word, sentence, language),
+            config.model,
+            schemaFor(language),
+          ),
         ),
       });
 

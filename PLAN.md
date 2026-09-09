@@ -105,7 +105,9 @@ Playwright drives a real Chromium with the built extension loaded.
 - `npm run test:live` — hits the real youtube.com and asserts only that the DOM contract
   still holds (caption container, subtitles button, a non-empty caption tracklist).
 
-Two things this cannot cover, and a human has to check once per platform:
+Two things this cannot cover, and a human has to check once per platform (both were
+verified by hand on YouTube on 2026-09-09: the panel showed the words of the line that
+was on screen, and the buffer served the previous line after the caption had cleared):
 
 1. **Caption text on the live site.** YouTube reports every caption track as
    `is_servable: false` for an automated, signed-out session, so no subtitle is ever
@@ -185,8 +187,12 @@ stay short for easy words.
 
 ### Phase 7 — `feat/settings`
 
-- [ ] Extension popup: target language, provider, API key, shortcut
+- [ ] Extension popup: target language, provider, API key
 - [ ] Persist in `chrome.storage.sync`
+- [ ] Link to `chrome://extensions/shortcuts` from the popup. `suggested_key` is only a
+      suggestion: if the combination is already taken the browser drops it silently and
+      the command shows as "Not set", with no error anywhere. It was never assigned on
+      first install under Vivaldi, whose own shortcut set is far denser than Chrome's.
 
 ### Phase 8 — `docs/readme`
 

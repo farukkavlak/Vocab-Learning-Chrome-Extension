@@ -14,8 +14,8 @@
   "commands": {
     "lookup-subtitle": {
       "suggested_key": {
-        "default": "Ctrl+H",
-        "mac": "Command+H"
+        "default": "Ctrl+Shift+H",
+        "mac": "Command+Shift+H"
       },
       "description": "Look up a word from the current subtitle line"
     }

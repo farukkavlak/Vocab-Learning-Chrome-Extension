@@ -196,17 +196,54 @@ The server has to be rewritten regardless, so redesign it rather than repair it.
 
 ```ts
 interface MeaningProvider {
-  lookup(word: string, sentence: string, targetLang: string): Promise<Meaning>;
+  lookup(word: string, sentence: string): Promise<Meaning>;
 }
 ```
 
-- [ ] `DictionaryApiProvider` — no key, free, context-free; the zero-setup default
-- [ ] `LlmProvider` — current SDK, current model, structured output, context-aware
-- [ ] Cache in `chrome.storage.local` keyed by (word, sentence)
-- [ ] Delete `AnswerFormat.js`; structured output removes the problem it patched
+**Decided: the dictionary answers first, the model only when asked.** The audience is
+people learning English by staying inside English, so an English definition is the
+answer they want, not a stop on the way to a translation.
 
-Keeping both behind one interface means the "hosted backend or bring-your-own-key?"
-decision does not have to be made now.
+What the 2023 version got wrong was never that it used a model — it was that it sent the
+word on its own, which is the one question a dictionary answers better, instantly and for
+free. The two are good at different things, measured against the free Wiktionary-backed
+`dictionaryapi.dev` on 2026-09-09:
+
+|                       | Dictionary                                   | Model                         |
+| --------------------- | -------------------------------------------- | ----------------------------- |
+| `department`, `alone` | instant, free, cacheable                     | a wasted call and a 2s wait   |
+| `run`                 | 63 senses, the first one literally "To run." | picks the sense the line uses |
+| `run into`            | looks up "run", loses the phrasal verb       | sees the phrase               |
+| `ran`, `better`       | often missing (`ran` answered 522 that day)  | unaffected                    |
+| pronunciation         | IPA **and** a recording                      | cannot give one               |
+| usage example         | a real example per sense                     | invents one                   |
+
+So the panel opens with the dictionary and offers the model as a second step:
+
+- [ ] `DictionaryApiProvider` — no key, free, the default. Fills `partOfSpeech`,
+      `meaningInContext`, `example`, `phonetic` and `audio`.
+- [ ] A control on the card — "in this sentence" — that asks `LlmProvider` with the whole
+      line and replaces the body. Current SDK, current model, structured output.
+- [ ] Cache both in `chrome.storage.local`, keyed by (word, sentence).
+- [ ] Delete `AnswerFormat.js`; structured output removes the problem it patched.
+- [ ] Show at most the first two senses of one part of speech. Dumping 63 definitions on
+      someone who paused a film is worse than saying nothing.
+
+Three things follow from putting the paid path behind a press:
+
+1. **The extension is fully useful with no key at all**, which the zero-setup default has
+   to mean if it is to mean anything.
+2. **A press is the honest signal** of which words were worth paying for — the free answer
+   had to fail the user first.
+3. **`server/` is deleted.** With the model called per press rather than per click, the
+   user's own key is a reasonable ask, and a hosted proxy buys nothing worth its bill,
+   its key handling or its privacy story. Both providers are called straight from the
+   content script; `manifest.config.ts` trades `localhost:3000` for their hosts.
+
+`dictionaryapi.dev` is a community service with no SLA — it answered 522 for `ran` three
+times running while this was written. The card already degrades to "Could not look up",
+and the model is one press away, but a paid dictionary is the obvious upgrade if this
+turns out to be common.
 
 **The schema is the point.** What changed since 2023 is less that models got better and
 more what we are able to ask. Not "what does _run_ mean" but "what does _run_ mean in
@@ -215,19 +252,24 @@ _He had to run the whole department alone_":
 ```ts
 type Meaning = {
   meaningInContext: string;
-  translation: string;
-  partOfSpeech: string;
-  cefr: "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
+  partOfSpeech?: string;
+  example?: string; // the dictionary's own, not an invented one
+  phonetic?: string; // IPA
+  audio?: string; // pronunciation the dictionary hosts
   phrase?: string; // set when the word belongs to an idiom / phrasal verb
+  cefr?: "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
+  translation?: string; // only when a target language is set; off by default
 };
 ```
 
 `phrase` matters: looking up "run" alone silently loses "run into". `cefr` lets the panel
-stay short for easy words.
+stay short for easy words. Both come from the model only. `translation` stays in the type
+but out of the default card — this audience is here to stay in English.
 
 ### Phase 7 — `feat/settings`
 
-- [ ] Extension popup: target language, provider, API key
+- [ ] Extension popup: API key for the model, and an optional target language (off by
+      default — see Phase 6)
 - [ ] Persist in `chrome.storage.sync`
 - [ ] Link to `chrome://extensions/shortcuts` from the popup. `suggested_key` is only a
       suggestion: if the combination is already taken the browser drops it silently and
@@ -240,8 +282,27 @@ stay short for easy words.
 - [ ] Screen recording of the real flow
 - [ ] Keep the history in it: Vision OCR first, DOM subtitles later, and why
 
+### Phase 9 — `feat/logbook`
+
+Where this is actually going, and the reason the rest exists.
+
+A lookup popup is a commodity; several extensions have done one for years. What none of
+them has is the moment: the line, the video, the timestamp, and the fact that _you_ did
+not know that word there. That record is data only this extension is standing in front
+of.
+
+- [ ] Save the word with its line, video and timestamp on lookup
+- [ ] A page listing them, grouped by video
+- [ ] Review built from the user's own sentences, not a stranger's deck
+
+It also puts the model where it earns its cost — not restating 63 definitions, but
+building review out of sentences the user actually met — and gives the extension a reason
+to be opened when nothing is playing. The shortcut changes meaning with it: today "explain
+this word", then "mark this — I did not know it", where the explaining is instant and free
+and the saving is the point.
+
 ## Deferred
 
-- **Word logbook / spaced repetition.** Revisit after Phase 7, backed by `chrome.storage`.
-- **Hosted backend.** `server/` is untouched until Phase 6 decides whether a hosted proxy
-  or bring-your-own-key wins. If BYO key wins, `server/` is deleted outright.
+- **Hosted backend.** Settled in Phase 6: bring-your-own-key wins and `server/` is
+  deleted. Revisit only if key handling turns out to be the thing that stops people
+  installing it.

@@ -1,36 +1,14 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
 import type { BrowserContext, Worker } from "@playwright/test";
-import { test, expect, lookup } from "./fixture";
-
-const here = dirname(fileURLToPath(import.meta.url));
-const fixtureHtml = readFileSync(
-  resolve(here, "fixtures/youtube.html"),
-  "utf8",
-);
-
-const WATCH_URL = "https://www.youtube.com/watch?v=test";
-
-test.beforeEach(async ({ context }) => {
-  await context.route("https://www.youtube.com/**", (route) =>
-    route.fulfill({ contentType: "text/html", body: fixtureHtml }),
-  );
-});
+import { test, expect, lookup, play, watchPage } from "./fixture";
 
 async function openPanel(
   context: BrowserContext,
   worker: Worker,
   { playing = true } = {},
 ) {
-  const page = await context.newPage();
-  await page.goto(WATCH_URL);
-
+  const page = await watchPage(context);
   if (playing) {
-    await page.evaluate(() => window.player.play());
-    await expect
-      .poll(() => page.evaluate(() => window.player.paused))
-      .toBe(false);
+    await play(page);
   }
 
   await page.evaluate(() =>

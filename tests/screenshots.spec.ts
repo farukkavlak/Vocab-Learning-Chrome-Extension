@@ -1,18 +1,18 @@
 // Writes PNGs of the panel to ./shots for visual review. Not part of `npm test`: it
 // asserts nothing, and every run overwrites the images. Run it with `npm run shots`.
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
-import type { BrowserContext, Worker } from "@playwright/test";
-import { test, lookup } from "./fixture";
+import type { BrowserContext } from "@playwright/test";
+import { test, lookup, watchPage } from "./fixture";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const fixtureHtml = readFileSync(
-  resolve(here, "fixtures/youtube.html"),
-  "utf8",
-);
 const OUT = process.env.SHOT_DIR ?? "shots";
-const WATCH_URL = "https://www.youtube.com/watch?v=test";
+
+// The whole schema, so the card is reviewed as it will look once the provider rewrite
+// fills every field in.
+const MEANING = {
+  meaningInContext: "to be the only person doing something, with no help",
+  translation: "tek başına, yardımsız",
+  partOfSpeech: "adverb",
+  cefr: "A2",
+};
 
 const scene = (captionBottom: number) => `
   video { width: 1280px; height: 720px; object-fit: cover;
@@ -23,27 +23,9 @@ const scene = (captionBottom: number) => `
   .ytp-caption-segment { background: rgba(8,8,8,0.75); padding: 2px 6px; }
 `;
 
-test.beforeEach(async ({ context }) => {
-  await context.route("https://www.youtube.com/**", (route) =>
-    route.fulfill({ contentType: "text/html", body: fixtureHtml }),
-  );
-  await context.route("http://localhost:3000/**", (route) =>
-    route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        meaningInContext: "to be the only person doing something, with no help",
-        translation: "tek başına, yardımsız",
-        partOfSpeech: "adverb",
-        cefr: "A2",
-      }),
-    }),
-  );
-});
-
 async function open(context: BrowserContext, captionBottom: number) {
-  const page = await context.newPage();
+  const page = await watchPage(context, { meaning: MEANING });
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto(WATCH_URL);
   await page.addStyleTag({ content: scene(captionBottom) });
   await page.evaluate(() => window.showCaption(["he had to run the whole"]));
   await page.waitForTimeout(80);
@@ -94,9 +76,8 @@ test("@shots a caption the player broke into two lines", async ({
   context,
   worker,
 }) => {
-  const page = await context.newPage();
+  const page = await watchPage(context, { meaning: MEANING });
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto(WATCH_URL);
   await page.addStyleTag({ content: scene(72) });
   await page.evaluate(() =>
     window.showCaption([

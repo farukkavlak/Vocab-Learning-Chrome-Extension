@@ -1,36 +1,10 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
-import { test, expect, lookup } from "./fixture";
-
-const here = dirname(fileURLToPath(import.meta.url));
-const fixtureHtml = readFileSync(
-  resolve(here, "fixtures/youtube.html"),
-  "utf8",
-);
-
-const WATCH_URL = "https://www.youtube.com/watch?v=test";
-
-test.beforeEach(async ({ context }) => {
-  await context.route("https://www.youtube.com/**", (route) =>
-    route.fulfill({ contentType: "text/html", body: fixtureHtml }),
-  );
-  await context.route("http://localhost:3000/**", (route) =>
-    route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        result: "to manage or be in charge of something",
-      }),
-    }),
-  );
-});
+import { test, expect, lookup, play, watchPage } from "./fixture";
 
 test("stands in for the caption instead of appearing somewhere else", async ({
   context,
   worker,
 }) => {
-  const page = await context.newPage();
-  await page.goto(WATCH_URL);
+  const page = await watchPage(context);
   await page.evaluate(() =>
     window.showCaption(["he had to run the department"]),
   );
@@ -68,8 +42,7 @@ test("shows the previous line above, as plain text", async ({
   context,
   worker,
 }) => {
-  const page = await context.newPage();
-  await page.goto(WATCH_URL);
+  const page = await watchPage(context);
   await page.evaluate(() => window.showCaption(["he had to run the whole"]));
   await page.evaluate(() => window.showCaption(["department alone this year"]));
   await lookup(worker);
@@ -89,8 +62,7 @@ test("opens the meaning above the word when there is no room below", async ({
   context,
   worker,
 }) => {
-  const page = await context.newPage();
-  await page.goto(WATCH_URL);
+  const page = await watchPage(context);
   await page.evaluate(() =>
     window.showCaption(["he had to run the department"]),
   );
@@ -111,11 +83,10 @@ test("stays on screen in a window too short for it", async ({
   context,
   worker,
 }) => {
-  const page = await context.newPage();
+  const page = await watchPage(context);
   // The panel is taller than the caption it replaces, and captions sit near the bottom.
   // Growing downwards from the caption used to run it off the bottom of the window.
   await page.setViewportSize({ width: 900, height: 420 });
-  await page.goto(WATCH_URL);
   await page.evaluate(() => window.showCaption(["he had to run the whole"]));
   await page.evaluate(() => window.showCaption(["department alone this year"]));
   await lookup(worker);
@@ -130,8 +101,7 @@ test("takes the caption's own font size, whatever the player set", async ({
   context,
   worker,
 }) => {
-  const page = await context.newPage();
-  await page.goto(WATCH_URL);
+  const page = await watchPage(context);
   // Players scale captions with the window and with fullscreen. A size of our own would
   // be wrong at every size but one.
   await page.addStyleTag({
@@ -152,8 +122,7 @@ test("the meaning never covers the line it explains", async ({
   context,
   worker,
 }) => {
-  const page = await context.newPage();
-  await page.goto(WATCH_URL);
+  const page = await watchPage(context);
   await page.evaluate(() =>
     window.showCaption(["he had to run the department"]),
   );
@@ -176,8 +145,7 @@ test("restores the caption when the panel is dismissed", async ({
   context,
   worker,
 }) => {
-  const page = await context.newPage();
-  await page.goto(WATCH_URL);
+  const page = await watchPage(context);
   await page.evaluate(() =>
     window.showCaption(["he had to run the department"]),
   );
@@ -195,12 +163,8 @@ test("the shortcut toggles: pressing it again resumes the video", async ({
   context,
   worker,
 }) => {
-  const page = await context.newPage();
-  await page.goto(WATCH_URL);
-  await page.evaluate(() => window.player.play());
-  await expect
-    .poll(() => page.evaluate(() => window.player.paused))
-    .toBe(false);
+  const page = await watchPage(context);
+  await play(page);
 
   await page.evaluate(() =>
     window.showCaption(["he had to run the department"]),

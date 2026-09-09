@@ -1,13 +1,4 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
-import { test, expect, lookup } from "./fixture";
-
-const here = dirname(fileURLToPath(import.meta.url));
-const fixtureHtml = readFileSync(
-  resolve(here, "fixtures/netflix.html"),
-  "utf8",
-);
+import { test, expect, lookup, watchPage } from "./fixture";
 
 /**
  * Netflix's real selectors are unverified — this proves the adapter mechanism, not the
@@ -17,12 +8,7 @@ test("the netflix adapter reads captions from its own container", async ({
   context,
   worker,
 }) => {
-  await context.route("https://www.netflix.com/**", (route) =>
-    route.fulfill({ contentType: "text/html", body: fixtureHtml }),
-  );
-
-  const page = await context.newPage();
-  await page.goto("https://www.netflix.com/watch/12345");
+  const page = await watchPage(context, { platform: "netflix" });
 
   await page.evaluate(() =>
     window.showCaption(["he had to", "run the department"]),

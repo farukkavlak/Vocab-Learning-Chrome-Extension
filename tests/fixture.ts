@@ -20,6 +20,15 @@ export const test = base.extend<{ context: BrowserContext; worker: Worker }>({
         `--disable-extensions-except=${distPath}`,
         `--load-extension=${distPath}`,
       ],
+      // Only for `npm run recording`, which turns the result into the README's animation.
+      ...(process.env.RECORD
+        ? {
+            recordVideo: {
+              dir: process.env.RECORD,
+              size: { width: 1280, height: 720 },
+            },
+          }
+        : {}),
     });
     await use(context);
     await context.close();

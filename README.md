@@ -1,135 +1,58 @@
-<a name="readme-top"></a>
+# VocabBoost
 
-<!-- PROJECT LOGO -->
-<br />
-<div align="center">
-  <a>
-    <img src="https://github.com/farukkavlak/vocabboost/blob/main/extension/public/logo.png" alt="Logo" width="180" height="180">
-  </a>
+Look up a word from a film's subtitles without leaving the film.
 
-<h3 align="center">VocabBoost</h3>
+![The panel opening in the caption's place, a word being looked up, and the model asked for the meaning in that line](docs/flow.gif)
 
-  <p align="center">
-    Vocabulary learning extension powered by AI/ChatGPT
-    <br>
-    <a href="#usage">Screenshots</a>
-    ·
-    <a href="https://github.com/farukkavlak/vocabboost/issues">Report Bug</a>
-    ·
-    <a href="https://github.com/farukkavlak/vocabboost/issues">Request Feature</a>
-  </p>
-</div>
+Press the shortcut. The video pauses and the subtitle line stays where it was, but its
+words are now clickable. Click one and you get its meaning, an example, and how it
+sounds. Esc, a click anywhere else, or pressing play puts the film back.
 
-<!-- TABLE OF CONTENTS -->
-<details>
-  <summary>Table of Contents</summary>
-  <ol>
-    <li>
-      <a href="#about-the-project">About The Project</a>
-      <ul>
-        <li><a href="#built-with">Built With</a></li>
-        <li><a href="#external-services">External Services</a></li>
-      </ul>
-    </li>
-    <li>
-      <a href="#getting-started">Getting Started</a>
-      <ul>
-        <li><a href="#installation">Installation</a></li>
-      </ul>
-    </li>
-    <li><a href="#usage">Usage</a></li>
-    <li><a href="#contact">Contact</a></li>
-  </ol>
-</details>
+None of that needs an account or a key. If the dictionary is not enough, one more press
+asks a model what the word means in that line, using your own API key.
 
-<!-- ABOUT THE PROJECT -->
+## Install
 
-## About The Project
+```sh
+npm install
+npm run build
+```
 
-Vocabulary learning extension powered by AI.It is designed to be used to learn when there is a word that you do not understand in the subtitle while watching a movie.
-It is a chrome extension that allows you to ask artificial intelligence for an explanation and example sentence with the help of a shortcut in real time when you encounter an English word that you do not know while watching a movie,series etc.
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+Open `chrome://extensions`, turn on Developer mode, choose Load unpacked, pick
+`extension/dist`.
 
-### Built With
+The suggested shortcut is `Ctrl+Shift+H` (`⌘⇧H` on macOS). Chrome drops it without
+warning if something else already uses it, so check `chrome://extensions/shortcuts`. The
+popup links there and shows the one you actually have.
 
-- [![javascript][javascript]][javascript]
-- [![node-js][node-js]][node-js]
+## Keys
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+The dictionary is [dictionaryapi.dev](https://dictionaryapi.dev): free, no key, and the
+only source of a pronunciation and a real example sentence.
 
-### External Services
+The model is optional and uses your own key, Claude or OpenAI.
 
-- ChatGPT
-- Google Vision API - Optical Character Recognition (OCR)
+- The key stays on your machine, in `storage.local`. Not in `sync`, which would copy it
+  to Google. There is no server of ours for it to reach.
+- It is used in the background worker, so it never reaches the script running on the
+  video page.
+- Access to a provider is requested only when you enter a key for it.
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+## Platforms
 
-<!-- GETTING STARTED -->
+- YouTube
+- Netflix
 
-## Getting Started
+A new one is a file in `extension/src/content/sources` plus a line in its `index.ts`. The
+manifest's match patterns are built from that list.
 
-This is an example of how you may give instructions on setting up your project locally.
-To get a local copy up and running follow these simple example steps.
+## How it works
 
-### Installation
+The content script reads captions from the page and keeps the last few lines, since a
+caption is often gone by the time you react to it. The panel is drawn in a shadow root,
+so page styles cannot reach it. Lookups run in the background worker, which is why the
+key never touches the page.
 
-1. Get a API Key at [https://platform.openai.com/](https://platform.openai.com/)
-2. Get a API Key at [https://cloud.google.com/vision](https://cloud.google.com/vision/docs/before-you-begin)
-3. Clone the repo
-   ```sh
-   git clone https://github.com/farukkavlak/vocabboost.git
-   ```
-4. There are two folder in project such as Extension and Server
-5. Install NPM packages in the server
-   ```sh
-   npm install
-   ```
-6. Create .env file in Server for environment variables and enter your OpenAI API key
-   ```js
-   STATUS = dev;
-   DEV_PORT = 3000;
-   PROD_PORT = 80;
-   OPENAI_API_KEY = "ENTER YOUR API KEY";
-   ```
-7. Enter your Google Vision API key and your server url(http://localhost:3000/) in the extension/content.js
-8. Run server
-   ```sh
-   nodemon index.js
-   ```
-9. Load chrome extension from chrome://extensions/
+---
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-<!-- USAGE EXAMPLES -->
-
-## Usage
-
-To use the extension, just press the extension's shortcut while watching a movie, series or any video with subtitles. This shortcut is **ctrl+h** for windows and **cmd+h** for macos. The video on the screen is paused so you don't miss the movie. Then, thanks to the Google Vision OCR API, the application captures the text in the photo and turns them into clickable buttons.(If you do not want to continue the process, you can press the **ESC** key, the buttons will disappear from the screen and the video will continue.) When you click on the word you want to learn the meaning of, it takes the meaning of this word and an example sentence with the help of ChatGPT and shows it as an alert. When you close the alert, the video continues.
-
-Screenshots are black because of the Netflix Privacy Issues
-<div align="center">
-  <a>
-    <img src="https://github.com/farukkavlak/vocabboost/blob/main/screenshots/usage-1.png" alt="usage-1">
-  </a>
-</div>
-<br>
-<div align="center">
-  <a>
-    <img src="https://github.com/farukkavlak/vocabboost/blob/main/screenshots/usage-2.png" alt="usage-2">
-  </a>
-</div>
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-<!-- CONTACT -->
-
-## Contact
-
-Ömer Faruk Kavlak - [linkedin.com/in/ömerfarukkavlak](https://www.linkedin.com/in/ömerfarukkavlak/)- [@ofarukdev](https://twitter.com/ofarukdev) - ofaruk.kavlak@gmail.com
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-<!-- MARKDOWN LINKS & IMAGES -->
-<!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-
-[javascript]: https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black
-[node-js]: https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white
+Ömer Faruk Kavlak — [LinkedIn](https://www.linkedin.com/in/omerfarukkavlak/)

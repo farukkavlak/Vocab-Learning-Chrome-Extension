@@ -1,226 +1,93 @@
 # Rewrite Plan
 
-Working document. One phase per branch, each merged into `main` before the next starts.
+Working document. One phase per branch, merged into `main` before the next starts.
 
-Baseline is `main` as it stands: two plain JavaScript files, no build step, and an
-Express server. The `refactor` branch (Vite + TS + React + Tesseract) is **abandoned** —
-it was half-finished and carried its own defects. It stays on the remote for now only so
-its `vite.config.ts` can be salvaged in Phase 2; delete it after that.
+## Why
 
-## Why a rewrite
+The 2023 version screenshotted the tab, sent the PNG to Google Cloud Vision for OCR, drew
+a button over every recognised word, and asked a server for a definition.
 
-The 2023 version works like this: on a shortcut, screenshot the tab, send the PNG to the
-**Google Cloud Vision** API for OCR, overlay an absolutely positioned button on every
-recognised word, and on click ask the server for a definition.
-
-Four things are wrong with that, and they are the reason for this rewrite:
-
-1. **OCR is unnecessary.** Subtitles are already in the DOM. Reading pixels back out of a
-   screenshot is fragile (device pixel ratio, zoom, fullscreen, scroll offset), costs an
-   API call per lookup, and needs `<all_urls>` plus screenshot permissions — which alone
-   would keep the extension out of the Chrome Web Store.
-2. **Definitions have no context.** The word is sent to the model on its own, so "run"
-   gets the same answer every time. The full subtitle line is right there — using it is
-   the entire value of the project.
-3. **The AI path is dead.** The server calls `createCompletion` with `text-davinci-003`
-   through `openai` v3. Both are retired. This is not an optional upgrade.
-4. **Nothing is platform-agnostic.** The content script matches `*://*/*` and knows
-   nothing about where it is, so it cannot read subtitles from anywhere specifically.
-
-## Known defects in the current code
-
-- [x] `extension/content.js` holds `googleVisionApiKey` client-side (placeholder today,
-      but the design puts a paid key in the client)
-- [x] `extension/manifest.json` requests `notifications`, `scripting` and `tabs`, none of
-      which are used; `host_permissions` and `content_scripts.matches` are both `*://*/*`
-- [x] `chrome.runtime.onMessage.removeListener(arguments.callee)` inside a `.then`
-      callback targets the wrong listener and throws in strict mode — dead line
-- [x] `content.js` builds a `buttons` array that is never read
-- [x] Every style is inline in `content.js`; there is no stylesheet
-- [x] Two `.gitignore` files (root and `server/`) that mostly duplicate each other
-- [x] `server/` depends on `nodemon` as a production dependency
-- [x] `AnswerFormat.js` exists only to patch up leading/trailing punctuation in free-text
-      model output — the problem structured output removes entirely
+1. OCR was unnecessary. Subtitles are in the DOM. Reading them back out of pixels is
+   fragile, costs an API call per lookup, and needs `<all_urls>` plus screenshot
+   permissions, which alone keep it out of the Web Store.
+2. The word was sent without its line, so "run" got the same answer every time.
+3. The server used `text-davinci-003` through `openai` v3. Both retired.
+4. The content script matched `*://*/*` and knew nothing about where it was running.
 
 ## Phases
 
-### Phase 1 — `chore/cleanup`
+### 1 — `chore/cleanup`
 
-No tooling, no logic. Just remove what is plainly dead.
-
-- [x] Merge the two `.gitignore` files into one at the root
-- [x] Drop the `notifications`, `scripting` and `tabs` permissions from the manifest
-- [x] Narrow `host_permissions` and `content_scripts.matches` from `*://*/*` to the
-      platforms actually supported
-- [x] Delete the `removeListener(arguments.callee)` line
+- [x] Merge the two `.gitignore` files into one
+- [x] Drop the unused `notifications`, `scripting` and `tabs` permissions
+- [x] Narrow `host_permissions` and `content_scripts.matches` from `*://*/*`
+- [x] Delete the `removeListener(arguments.callee)` line, which threw in strict mode
 - [x] Move `nodemon` to `devDependencies`
 
-### Phase 2 — `chore/toolchain`
+### 2 — `chore/toolchain`
 
-Set the workbench up once, before touching any behaviour.
-
-- [x] Root `package.json` with npm workspaces (`extension`, `server`)
-- [x] Vite build for the extension; salvage `vite.config.ts` from the `refactor` branch,
-      and make it copy the manifest and static assets so `npm run build` emits a
-      directory that loads as an unpacked extension
-- [x] TypeScript + `tsconfig.json` (no wildcard `paths`) and `@types/chrome`
-- [x] Mechanically port `background.js` and `content.js` to `.ts` — types only, no logic
-      changes. It is ~250 lines total.
-- [x] ESLint flat config + `@typescript-eslint`
-- [x] Prettier with default settings (no bikeshedding) + `eslint-config-prettier`
-- [x] `.editorconfig`
+- [x] npm workspaces, Vite build, TypeScript, `@types/chrome`
+- [x] Port `background.js` and `content.js` to `.ts`, types only
+- [x] ESLint, Prettier, `.editorconfig`, husky + lint-staged
 - [x] Scripts: `build`, `lint`, `format`, `typecheck`
-- [x] `husky` + `lint-staged` so commits are formatted automatically
-- [x] Run `prettier --write .` once, as the last commit on the branch
 
-`server/` is left out of the port on purpose — it is rewritten from scratch in Phase 6,
-so converting it now would be thrown away. Lint may ignore it until then.
+Decided: plain TypeScript and CSS. React and Tailwind for one settings form is more
+machinery than this earns.
 
-**Decided:** plain TypeScript and CSS for both the overlay and the settings page. No
-popup exists yet, so nothing forced a UI framework, and React plus Tailwind for one
-settings form is more machinery than the project earns.
+### 3 — `refactor/remove-ocr`
 
-### Phase 3 — `refactor/remove-ocr`
+- [x] Delete the Vision call, the API key constant, the base64 payload
+- [x] Delete `captureVisibleTab` and the bbox maths (`dpr`, scroll offset, `innerWidth`)
+- [x] Drop `vision.googleapis.com` from `host_permissions`
+- [x] Read captions with a `MutationObserver` and keep the last ~5 lines with their
+      `video.currentTime`
 
-- [x] Delete the Google Vision call, the API key constant and the base64 payload
-- [x] Delete the screenshot path in `background.ts` (`captureVisibleTab`) and the
-      `isScreenshot` message
-- [x] Delete the bbox→percentage math (`dpr`, `scrollOffset`, `innerWidth`) and the
-      per-word absolutely positioned buttons
-- [x] Drop `https://vision.googleapis.com/*` from `host_permissions` (kept in Phase 1
-      only so the current behaviour was not broken by narrowing the wildcard)
-- [x] Replace with a subtitle ring buffer: a `MutationObserver` on the caption container
-      keeping the last ~5 lines with their `video.currentTime`
+### 4 — `refactor/caption-port`
 
-Ends with the extension smaller, its permissions harmless, and no third-party OCR bill.
+- [x] A `CaptionSource` port and a registry that picks by `matches(location.href)`
+- [x] YouTube (`.ytp-caption-window-container`) and Netflix (`.player-timedtext`)
+- [x] Generate the manifest's match patterns from the registry, so a platform is declared
+      once
 
-## Testing
+Netflix's selectors are unverified against a live session. The tests prove the mechanism,
+not the selectors.
 
-Playwright drives a real Chromium with the built extension loaded.
+### 5 — `feat/overlay`
 
-- `npm test` — the deterministic suite. `context.route` serves a local fixture under a
-  `youtube.com` URL, so the manifest's match pattern applies and the content script is
-  injected exactly as in production. Covers the buffer, the fallback to the last line,
-  multi-segment joining, word filtering, pause and resume.
-- `npm run test:live` — hits the real youtube.com and asserts only that the DOM contract
-  still holds (caption container, subtitles button, a non-empty caption tracklist).
-- `npm run shots` — writes PNGs of the panel to `shots/`. Asserts nothing; it exists
-  because the layout defects above were invisible in the test output.
+- [x] Remove the `window.alert` override and every inline style
+- [x] A stylesheet in a shadow root, so the page and the panel cannot reach each other
+- [x] The panel: shortcut, pause, clickable words, previous line above, Esc to resume
 
-Anything asserting on geometry has to wait for the opening animation first (`settled()`
-in `tests/fixture.ts`). A rect read while an element animates is where the animation has
-it at that instant, not where it was placed — which is what an intermittent 2-4px failure
-in the alignment test turned out to be.
+Decided: the panel takes the caption's place so the eye does not move, and the meaning
+opens under the clicked word.
 
-Two things this cannot cover, and a human has to check once per platform (both were
-verified by hand on YouTube on 2026-09-09: the panel showed the words of the line that
-was on screen, and the buffer served the previous line after the caption had cleared):
+### 5b — polish
 
-1. **Caption text on the live site.** YouTube reports every caption track as
-   `is_servable: false` for an automated, signed-out session, so no subtitle is ever
-   rendered under Playwright. The fixture's caption markup is our reconstruction of
-   YouTube's, not a capture of it.
-2. **The keyboard shortcut.** `chrome.commands` shortcuts are registered by the browser
-   and cannot be triggered from Playwright, so tests send `LOOKUP_SUBTITLE` to the
-   content script directly and the wiring in `background.ts` is untested.
-3. **Granting an optional host permission.** Chrome asks for it in its own bubble, which
-   Playwright cannot click, so `chrome.permissions.request` is stubbed in the settings
-   tests. The permission is genuinely enforced — a worker `fetch` to an ungranted origin
-   fails, measured on 2026-09-09 — but a routed request is fulfilled before Chrome checks
-   for it, so the model tests pass without it. What the suite proves is that the page
-   asks for the right origin and refuses to save a key when access is denied.
-4. **A live call to a model provider.** Both are stubbed. The request shape follows the
-   current API documentation, but one real call with a real key should be made by hand
-   before release.
+Screenshots of the built extension (`npm run shots`) showed what reading the code had not.
 
-### Phase 4 — `refactor/caption-port`
+- [x] The panel grew downwards and ran off short windows. It is anchored on its own line
+      of words, aligned to the caption's centre, and grows upwards.
+- [x] Chips made the line read as a tag cloud. Every token is drawn now; only the words
+      worth a lookup are buttons, marked on hover. The lookup still uses the bare word.
+- [x] The fixed 19px became the caption's own computed size, so it matches in fullscreen.
+      The card's text is scaled from it but bounded.
+- [x] Width is the caption's plus what the hover padding adds, capped at 92% of the
+      window.
+- [x] The card was white over a dark video and covered the sentence. It is dark, points
+      at its word, and clears the whole line.
+- [x] Esc closes the card first, the panel second. The panel takes focus so the arrow
+      keys walk the line.
 
-Ports and adapters. The content script must not know any platform.
+Resuming: the shortcut and Esc were the only ways back. The content script listens for
+the video's `play` event now, so however it is started the panel gets out of the way.
+Clicking outside dismisses it too. A video that was already paused is left paused.
 
-```ts
-type CaptionLine = { text: string; at: number };
+### 6 — `refactor/meaning-provider`
 
-interface CaptionSource {
-  readonly id: string;
-  matches(url: string): boolean;
-  attach(onLine: (line: CaptionLine) => void): () => void; // returns detach
-  getVideo(): HTMLVideoElement | null;
-}
-```
+Decided: **the dictionary answers first, the model only when asked.** The audience is
+people learning English inside English, so an English definition is the answer they want.
 
-- [x] `CaptionSource` port + a registry that picks by `matches(location.href)`
-- [x] `YouTubeCaptionSource` (`.ytp-caption-window-container`)
-- [x] `NetflixCaptionSource` (`.player-timedtext`)
-- [x] Generate the manifest's `content_scripts.matches` and `host_permissions` from the
-      registry at build time, so platforms are declared in exactly one place
-
-Adding a platform is one new file plus one line in the registry.
-
-Netflix's selectors have not been checked against a live session. The suite proves the
-adapter mechanism against a fixture, not that `.player-timedtext` is still correct.
-
-### Phase 5 — `feat/overlay`
-
-- [x] Remove the `window.alert` override (`createCustomAlert`) and every inline style
-- [x] A real stylesheet, injected in a shadow root so the host page cannot bleed into it
-- [x] Own panel: shortcut → pause → split the buffered line into clickable words → show
-      the previous line dimmed above → Esc or close → resume
-
-Decided while building it: the panel takes the caption's place rather than opening
-elsewhere, so the eye never moves; the meaning opens under the clicked word, flipping
-above it when there is no room below, which near the bottom of the screen is most of the
-time; the previous line sits above as plain text, for context but not clickable.
-
-### Phase 5b — polish
-
-The first pass was drawn against a fixture and never looked at. Screenshots of the built
-extension (`npm run shots`) showed what reading the code had not:
-
-- [x] The panel grew downwards from the caption's top, so in a short window it ran off
-      the bottom of the screen. It is anchored by its own line of words now, which is
-      lined up on the caption's centre; the box grows upwards from there.
-- [x] The words were chips in a row, which read as a tag cloud rather than a sentence.
-      Every token is rendered now — punctuation, numbers and one-letter words as plain
-      text — and only the words worth a lookup are buttons, marked on hover alone. The
-      lookup still uses the bare word.
-- [x] The panel used a fixed 19px. It takes the caption's own computed size now, so it
-      matches in a small window and in fullscreen; the card's prose is scaled from it
-      but bounded, since prose set at caption size is unreadable.
-- [x] Its width was the caption's times 1.15. The extra room a line needs is its words'
-      hover padding, which follows the word count, not the caption's width; past that it
-      wraps where the caption did, and never spans more than 92% of the window.
-- [x] The meaning card was white on a dark video and covered the rest of the sentence.
-      It is dark now, points at its word with an arrow, and clears the whole line —
-      the sentence is the context the meaning is read in.
-- [x] The card already lays out the Phase 6 schema (part of speech, CEFR, phrase,
-      translation), so that phase only has to supply the data.
-- [x] Esc closes the card first and the panel second; the panel takes focus so the arrow
-      keys walk the line without tabbing into the shadow root.
-
-**Resuming.** The shortcut and Esc were the only ways back to the video, so pressing the
-player's own play button left the video running behind a frozen panel with the real
-captions still hidden. The content script listens for the video's `play` event now:
-however the user starts it — Space, the player, a double click — the panel gets out of
-the way. Clicking outside it dismisses it too, and a video that was already paused before
-the lookup is left paused, since resuming it would be a decision the user never made.
-
-### Phase 6 — `refactor/meaning-provider`
-
-The server has to be rewritten regardless, so redesign it rather than repair it.
-
-```ts
-interface MeaningProvider {
-  lookup(word: string, sentence: string): Promise<Meaning>;
-}
-```
-
-**Decided: the dictionary answers first, the model only when asked.** The audience is
-people learning English by staying inside English, so an English definition is the
-answer they want, not a stop on the way to a translation.
-
-What the 2023 version got wrong was never that it used a model — it was that it sent the
-word on its own, which is the one question a dictionary answers better, instantly and for
-free. The two are good at different things, measured against the free Wiktionary-backed
+The 2023 mistake was not using a model, it was sending the word alone. Measured against
 `dictionaryapi.dev` on 2026-09-09:
 
 |                       | Dictionary                                   | Model                         |
@@ -229,138 +96,133 @@ free. The two are good at different things, measured against the free Wiktionary
 | `run`                 | 63 senses, the first one literally "To run." | picks the sense the line uses |
 | `run into`            | looks up "run", loses the phrasal verb       | sees the phrase               |
 | `ran`, `better`       | often missing (`ran` answered 522 that day)  | unaffected                    |
-| pronunciation         | IPA **and** a recording                      | cannot give one               |
+| pronunciation         | IPA and a recording                          | cannot give one               |
 | usage example         | a real example per sense                     | invents one                   |
 
-So the panel opens with the dictionary and offers the model as a second step:
-
-- [x] `DictionaryApiProvider` — no key, free, the default. Fills `partOfSpeech`,
-      `senses`, `example`, `phonetic` and `audio`.
-- [x] A control on the card — "In this sentence" — that asks the model with the whole
-      line and replaces the senses, keeping the pronunciation the dictionary gave.
-- [x] Providers are a registry like `sources/`: `llm.ts` holds the prompt, the schema and
-      the request; `anthropic.ts` and `openai.ts` are a dozen lines each. Unlike a caption
-      source, which recognises its own page, the reader chooses this one — whichever key
-      they entered.
-- [x] Cache in `chrome.storage.local`. Keyed by (provider, word), plus the sentence only
-      for a provider that reads it — the dictionary answers the same wherever the word
-      was met, so keying its answer by sentence would miss every hit.
-- [x] Delete `AnswerFormat.js`, and `server/` with it; structured output removes the
-      problem it patched.
-- [x] Show at most the first two senses of one part of speech. Dumping 63 definitions on
-      someone who paused a film is worse than saying nothing.
-- [x] The pronunciation is fetched and played from a blob, not handed to the element as a
-      remote `src`: a content script's `fetch` carries the extension's host permissions,
-      while a media element loading a remote URL answers to the host page's CSP.
-
-Three things follow from putting the paid path behind a press:
-
-1. **The extension is fully useful with no key at all**, which the zero-setup default has
-   to mean if it is to mean anything.
-2. **A press is the honest signal** of which words were worth paying for — the free answer
-   had to fail the user first.
-3. **`server/` is deleted.** With the model called per press rather than per click, the
-   user's own key is a reasonable ask, and a hosted proxy buys nothing worth its bill,
-   its key handling or its privacy story. Both providers are called straight from the
-   content script; `manifest.config.ts` trades `localhost:3000` for their hosts.
-
-`dictionaryapi.dev` is a community service with no SLA — it answered 522 for `ran` three
-times running while this was written. The card already degrades to "Could not look up",
-and the model is one press away, but a paid dictionary is the obvious upgrade if this
-turns out to be common.
-
-**The schema is the point.** What changed since 2023 is less that models got better and
-more what we are able to ask. Not "what does _run_ mean" but "what does _run_ mean in
-_He had to run the whole department alone_":
+- [x] `DictionaryApiProvider`: no key, the default. Fills `partOfSpeech`, `senses`,
+      `example`, `phonetic`, `audio`.
+- [x] "In this sentence" on the card asks the model with the whole line, and keeps the
+      pronunciation the dictionary gave.
+- [x] Providers are a registry like `sources/`. `llm.ts` holds the prompt, the schema and
+      the request; `anthropic.ts` and `openai.ts` are a dozen lines each. The reader
+      chooses this one, unlike a caption source, which recognises its own page.
+- [x] Cache in `chrome.storage.local`, keyed by (provider, word), plus the sentence only
+      for a provider that reads it. Keying the dictionary by sentence would miss every
+      hit.
+- [x] Show at most two senses of one part of speech.
+- [x] Delete `AnswerFormat.js` and `server/`.
+- [x] The pronunciation is fetched and played from a blob. A media element with a remote
+      `src` answers to the host page's CSP.
 
 ```ts
 type Meaning = {
   senses: { definition: string; example?: string }[];
   partOfSpeech?: string;
-  phonetic?: string; // IPA
-  audio?: string; // pronunciation the dictionary hosts
-  phrase?: string; // set when the word belongs to an idiom / phrasal verb
+  phonetic?: string;
+  audio?: string;
+  phrase?: string; // set when the word belongs to an idiom or phrasal verb
   cefr?: "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
-  translation?: string; // only when a target language is set; off by default
+  translation?: string; // only when a target language is set
 };
 ```
 
-`senses` is a list because the dictionary answers with several — it cannot know which one
-the line uses — while the model answers with exactly one. Everything else is optional:
-no provider supplies all of it, and the card draws what it is given.
+`senses` is a list because the dictionary answers with several and the model with one.
+`phrase` matters: looking up "run" alone loses "run into". `cefr` lets the card stay short
+for easy words. Both come from the model only.
 
-`phrase` matters: looking up "run" alone silently loses "run into". `cefr` lets the panel
-stay short for easy words. Both come from the model only. `translation` stays in the type
-but out of the default card — this audience is here to stay in English.
+Decided while building it:
 
-**Decided while building it.**
-
-- **Lookups run in the background worker, not the content script.** Its requests carry
-  the extension's host permissions, so each provider's CORS policy stops mattering —
-  measured on 2026-09-09: a page-origin preflight to `api.anthropic.com` is refused
-  unless `anthropic-dangerous-direct-browser-access` is set, while the same request from
-  the worker reaches the server without it. It also means an API key never enters a
-  script that shares a page with the site.
-- **Raw `fetch`, not each vendor's SDK.** Anthropic's own guidance prefers the official
-  SDK; the multi-provider design outweighs it here. One shared transport keeps the two
-  adapters the same shape and the worker bundle at 8 KB — the Anthropic SDK alone
-  unpacks to 9 MB. The cost is updating two request shapes by hand if an API changes.
+- **Lookups run in the background worker.** Its requests carry the extension's own
+  permissions, so no provider's CORS policy matters. Measured 2026-09-09: a page-origin
+  preflight to `api.anthropic.com` is refused without
+  `anthropic-dangerous-direct-browser-access`; from the worker it is not needed. The key
+  also never enters a script sharing a page with the site.
+- **Raw `fetch`, not each vendor's SDK.** Anthropic's guidance prefers the SDK, but one
+  shared transport keeps both adapters the same shape and the worker at 8 KB, against
+  9 MB unpacked for the Anthropic SDK alone. The cost is updating two request shapes by
+  hand if an API changes.
 - **`claude-haiku-4-5` and `gpt-4o-mini` as defaults.** A subtitle word is a small
-  question; the settings page will let either be changed.
-- **Keys in `storage.local`, one per provider.** `sync` would carry them to Google's
-  servers. A reader who has pasted a single key has already chosen their provider, so
-  nothing asks them to pick as well.
+  question.
+- **Keys in `storage.local`, one per provider.** `sync` would carry them to Google.
+- **The paid path sits behind a press,** so the extension is useful with no key, and the
+  user's own key is a reasonable ask. That is why `server/` is gone: a hosted proxy buys
+  nothing worth its bill.
 
-### Phase 7 — `feat/settings`
+`dictionaryapi.dev` is a community service with no SLA. A paid dictionary is the obvious
+upgrade if the failures get common.
 
-- [x] Extension popup: the service first, then one key field, then an optional language.
-      It is the only way to enter a key, which is why the card left the model step out
-      until now.
-- [x] Provider hosts moved to `optional_host_permissions`, requested beside the key
-      field. A keyless install is no longer asked for access to two vendors' APIs it will
-      never call, and a key is not saved if access is refused — a key that cannot be used
-      would look configured and fail later.
-- [x] Each provider carries a `label` and a link to where its key is issued, both read by
-      the popup now. They were written in Phase 6 and removed again for want of a reader.
-- [x] Preferences (service, language) in `chrome.storage.sync`; keys in `storage.local`,
-      one per provider, so switching service does not throw the other key away.
-- [x] Link to `chrome://extensions/shortcuts` from the popup, opened with
-      `chrome.tabs.create` because a page cannot link to a `chrome://` URL.
-      `suggested_key` is only a suggestion: if the combination is already taken the
-      browser drops it silently and the command shows as "Not set", with no error
-      anywhere. It was never assigned on first install under Vivaldi, whose own shortcut
-      set is far denser than Chrome's.
+### 7 — `feat/settings`
 
-**A translation is asked for only when a language is set**, and then the prompt and the
-schema both grow the field. English stays the default, as Phase 6 settled.
+- [x] Popup: the service first, then one key field, then an optional language
+- [x] Provider hosts moved to `optional_host_permissions`, requested beside the key field.
+      A keyless install is never asked, and a key is not saved if access is refused.
+- [x] Each provider carries a `label` and a link to where its key is issued
+- [x] Preferences in `chrome.storage.sync`, keys in `storage.local`, one per provider, so
+      switching service does not throw the other key away
+- [x] Link to `chrome://extensions/shortcuts`, opened with `chrome.tabs.create` because a
+      page cannot link to a `chrome://` URL. `suggested_key` is only a suggestion: a taken
+      combination is dropped in silence. It was never assigned under Vivaldi.
 
-### Phase 8 — `docs/readme`
+A translation is asked for only when a language is set, and then the prompt and the schema
+both grow the field.
 
-- [ ] Rewrite the README from scratch
-- [ ] Screen recording of the real flow
-- [ ] Keep the history in it: Vision OCR first, DOM subtitles later, and why
+### 8 — `docs/readme`
 
-### Phase 9 — `feat/logbook`
+- [x] Rewrite the README. The old one was a template with badges, a table of contents for
+      three sections, and setup steps for a Vision key and a server that no longer exist.
+- [x] `npm run recording` plays the flow once under Playwright and turns the video into
+      `docs/flow.gif`, so it is regenerated rather than kept by hand
+- [x] Delete `screenshots/`, which showed the OCR-era flow
 
-Where this is actually going, and the reason the rest exists.
+### 9 — `feat/logbook`
 
-A lookup popup is a commodity; several extensions have done one for years. What none of
-them has is the moment: the line, the video, the timestamp, and the fact that _you_ did
-not know that word there. That record is data only this extension is standing in front
-of.
+Where this is going. A lookup popup is a commodity; the record is not. The line, the
+video, the timestamp, and the fact that you did not know that word there.
 
 - [ ] Save the word with its line, video and timestamp on lookup
 - [ ] A page listing them, grouped by video
-- [ ] Review built from the user's own sentences, not a stranger's deck
+- [ ] Review built from the user's own sentences
 
-It also puts the model where it earns its cost — not restating 63 definitions, but
-building review out of sentences the user actually met — and gives the extension a reason
-to be opened when nothing is playing. The shortcut changes meaning with it: today "explain
-this word", then "mark this — I did not know it", where the explaining is instant and free
-and the saving is the point.
+It gives the extension a reason to be opened when nothing is playing, and puts the model
+somewhere it earns its cost.
+
+## Testing
+
+Playwright drives a real Chromium with the built extension loaded.
+
+- `npm test` — the deterministic suite. `context.route` serves a fixture under a
+  `youtube.com` URL, so the manifest's match pattern applies and the content script is
+  injected as in production.
+- `npm run test:live` — hits youtube.com and checks only that the DOM contract holds.
+- `npm run shots` — writes PNGs of the panel. Asserts nothing; the layout defects in
+  phase 5b were invisible in test output.
+- `npm run recording` — rebuilds `docs/flow.gif`. Needs ffmpeg.
+
+Anything asserting on geometry waits for the opening animation first (`settled()` in
+`tests/fixture.ts`). A rect read mid-animation is where the animation has it, not where it
+was placed, which is what an intermittent 2-4px failure turned out to be.
+
+Four things the suite cannot cover:
+
+1. **Caption text on the live site.** YouTube reports every caption track as
+   `is_servable: false` for a signed-out automated session, so no subtitle is rendered
+   under Playwright. The fixture's markup is our reconstruction.
+2. **The keyboard shortcut.** `chrome.commands` shortcuts cannot be triggered from
+   Playwright, so tests message the content script directly and the wiring in
+   `background.ts` is untested.
+3. **Granting an optional host permission.** Chrome asks in its own bubble, which
+   Playwright cannot click, so `chrome.permissions.request` is stubbed. The permission is
+   enforced (a worker `fetch` to an ungranted origin fails, measured 2026-09-09), but a
+   routed request is fulfilled before Chrome checks, so the model tests pass without it.
+   What the suite proves is that the page asks for the right origin and refuses to save a
+   key when access is denied.
+4. **A live call to a model provider.** Both are stubbed. One real call with a real key
+   should be made by hand before release.
+
+Checked by hand on YouTube, 2026-09-09: the panel showed the words of the line on screen,
+and the buffer served the previous line after the caption had cleared.
 
 ## Deferred
 
-- **Hosted backend.** Settled in Phase 6: bring-your-own-key wins and `server/` is
-  deleted. Revisit only if key handling turns out to be the thing that stops people
-  installing it.
+**Hosted backend.** Settled in phase 6: bring-your-own-key, and `server/` is deleted.
+Revisit only if key handling turns out to be what stops people installing it.

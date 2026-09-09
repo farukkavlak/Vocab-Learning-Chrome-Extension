@@ -18,7 +18,8 @@
     "prepare": "husky",
     "test": "playwright test",
     "test:live": "LIVE=1 playwright test youtube-live",
-    "shots": "SHOTS=1 playwright test screenshots"
+    "shots": "SHOTS=1 playwright test screenshots",
+    "recording": "bash scripts/recording.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

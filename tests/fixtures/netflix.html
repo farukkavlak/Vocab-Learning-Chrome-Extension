@@ -1,0 +1,59 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Fake Netflix player</title>
+<style>
+  body {
+    margin: 0;
+    background: #111;
+  }
+  video {
+    width: 640px;
+    height: 360px;
+  }
+</style>
+
+<!--
+  A stand-in for a YouTube watch page. It reproduces only what the content script
+  depends on: a <video> element and a caption container holding one span per segment.
+  It deliberately does not reproduce the rest of YouTube.
+-->
+<video id="player" muted playsinline></video>
+<div class="player-timedtext"></div>
+
+<script>
+  // A canvas stream gives the <video> a real source, so play() resolves and
+  // video.paused actually reflects playback state.
+  const video = document.getElementById("player");
+  const canvas = document.createElement("canvas");
+  canvas.width = 640;
+  canvas.height = 360;
+  canvas.getContext("2d").fillRect(0, 0, 640, 360);
+  video.srcObject = canvas.captureStream(30);
+
+  const container = document.querySelector(".player-timedtext");
+
+  // Mirrors how YouTube renders a caption: a window div with one segment span per
+  // visual line, replaced wholesale on every new subtitle.
+  window.showCaption = (segments) => {
+    container.innerHTML = "";
+    const win = document.createElement("div");
+    win.className = "caption-window";
+    const text = document.createElement("span");
+    text.className = "captions-text";
+    for (const segment of segments) {
+      const line = document.createElement("span");
+      line.className = "caption-visual-line";
+      const span = document.createElement("span");
+      span.className = "player-timedtext-text-container";
+      span.textContent = segment;
+      line.appendChild(span);
+      text.appendChild(line);
+    }
+    win.appendChild(text);
+    container.appendChild(win);
+  };
+
+  window.clearCaption = () => {
+    container.innerHTML = "";
+  };
+</script>

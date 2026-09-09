@@ -9,7 +9,7 @@ export default defineConfig({
     target: "chrome114",
     minify: false,
     lib: {
-      entry: "src/content.ts",
+      entry: "src/content/index.ts",
       formats: ["iife"],
       name: "content",
       fileName: () => "content.js",

@@ -132,13 +132,16 @@ interface CaptionSource {
 }
 ```
 
-- [ ] `CaptionSource` port + a registry that picks by `matches(location.href)`
-- [ ] `YouTubeCaptionSource` (`.ytp-caption-window-container`)
-- [ ] `NetflixCaptionSource` (`.player-timedtext`)
-- [ ] Generate the manifest's `content_scripts.matches` and `host_permissions` from the
+- [x] `CaptionSource` port + a registry that picks by `matches(location.href)`
+- [x] `YouTubeCaptionSource` (`.ytp-caption-window-container`)
+- [x] `NetflixCaptionSource` (`.player-timedtext`)
+- [x] Generate the manifest's `content_scripts.matches` and `host_permissions` from the
       registry at build time, so platforms are declared in exactly one place
 
-Adding a platform should be one new file plus one line in the registry.
+Adding a platform is one new file plus one line in the registry.
+
+Netflix's selectors have not been checked against a live session. The suite proves the
+adapter mechanism against a fixture, not that `.player-timedtext` is still correct.
 
 ### Phase 5 — `feat/overlay`
 

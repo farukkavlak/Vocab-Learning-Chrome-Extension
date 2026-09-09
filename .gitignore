@@ -20,3 +20,5 @@ npm-debug.log*
 # Editors / OS
 .vscode/
 .DS_Store
+test-results/
+playwright-report/

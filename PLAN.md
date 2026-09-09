@@ -94,6 +94,27 @@ settings form is more machinery than the project earns.
 
 Ends with the extension smaller, its permissions harmless, and no third-party OCR bill.
 
+## Testing
+
+Playwright drives a real Chromium with the built extension loaded.
+
+- `npm test` — the deterministic suite. `context.route` serves a local fixture under a
+  `youtube.com` URL, so the manifest's match pattern applies and the content script is
+  injected exactly as in production. Covers the buffer, the fallback to the last line,
+  multi-segment joining, word filtering, pause and resume.
+- `npm run test:live` — hits the real youtube.com and asserts only that the DOM contract
+  still holds (caption container, subtitles button, a non-empty caption tracklist).
+
+Two things this cannot cover, and a human has to check once per platform:
+
+1. **Caption text on the live site.** YouTube reports every caption track as
+   `is_servable: false` for an automated, signed-out session, so no subtitle is ever
+   rendered under Playwright. The fixture's caption markup is our reconstruction of
+   YouTube's, not a capture of it.
+2. **The keyboard shortcut.** `chrome.commands` shortcuts are registered by the browser
+   and cannot be triggered from Playwright, so tests send `LOOKUP_SUBTITLE` to the
+   content script directly and the wiring in `background.ts` is untested.
+
 ### Phase 4 — `refactor/caption-port`
 
 Ports and adapters. The content script must not know any platform.

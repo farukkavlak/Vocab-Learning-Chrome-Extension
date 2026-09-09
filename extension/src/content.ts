@@ -2,6 +2,7 @@ const SERVER_URL = "http://localhost:3000";
 
 // YouTube only for now; Phase 4 turns this into a per-platform adapter.
 const CAPTION_CONTAINER_SELECTOR = ".ytp-caption-window-container";
+const CAPTION_SEGMENT_SELECTOR = ".ytp-caption-segment";
 
 const BUFFER_SIZE = 5;
 const CONTAINER_POLL_MS = 1000;
@@ -16,11 +17,8 @@ interface LookupMessage {
   type: "LOOKUP_SUBTITLE";
 }
 
-/**
- * The last few subtitle lines, oldest first. The buffer exists because the caption
- * container is emptied between lines: by the time the user reacts to a word, the line
- * they saw may already be gone from the DOM.
- */
+// Kept because the caption is cleared between lines: by the time the user reacts to a
+// word, the line they saw may already be gone from the DOM.
 const buffer: CaptionLine[] = [];
 
 let observed: Element | null = null;
@@ -39,9 +37,14 @@ function pauseVideo(): void {
 }
 
 function readCaption(container: Element): string {
-  // innerText, not textContent: the container holds one span per caption segment and
-  // textContent would glue them together without spaces.
-  return (container as HTMLElement).innerText.replace(/\s+/g, " ").trim();
+  // Joined explicitly: textContent glues segments together, and innerText separates them
+  // only when their CSS happens to be block-level.
+  const segments = container.querySelectorAll(CAPTION_SEGMENT_SELECTOR);
+  const text = segments.length
+    ? Array.from(segments, (segment) => segment.textContent ?? "").join(" ")
+    : (container as HTMLElement).innerText;
+
+  return text.replace(/\s+/g, " ").trim();
 }
 
 function record(text: string): void {
@@ -69,28 +72,24 @@ function observe(container: Element): void {
   record(readCaption(container));
 }
 
-/**
- * The caption container is created when subtitles are turned on and destroyed on SPA
- * navigation, so it cannot be looked up once at startup. Polling for it every second is
- * cheaper and far less noisy than observing the whole document on a page like YouTube.
- */
-function watchForCaptionContainer(): void {
-  setInterval(() => {
-    const container = document.querySelector(CAPTION_CONTAINER_SELECTOR);
-    if (container && container !== observed) {
-      observe(container);
-    } else if (!container && observed) {
-      observer?.disconnect();
-      observer = null;
-      observed = null;
-    }
-  }, CONTAINER_POLL_MS);
+// The container comes and goes with the subtitle toggle and SPA navigation. Polling for
+// it beats observing the whole document, which on YouTube fires constantly.
+function syncObserver(): void {
+  const container = document.querySelector(CAPTION_CONTAINER_SELECTOR);
+  if (container && container !== observed) {
+    observe(container);
+  } else if (!container && observed) {
+    observer?.disconnect();
+    observer = null;
+    observed = null;
+  }
 }
 
-/**
- * The line the user is reacting to: whatever is on screen right now, or the last line
- * that was, if the caption has already been cleared.
- */
+function watchForCaptionContainer(): void {
+  syncObserver();
+  setInterval(syncObserver, CONTAINER_POLL_MS);
+}
+
 function currentLine(): CaptionLine | null {
   const container = document.querySelector(CAPTION_CONTAINER_SELECTOR);
   const onScreen = container ? readCaption(container) : "";
@@ -101,11 +100,8 @@ function currentLine(): CaptionLine | null {
   return buffer[buffer.length - 1] ?? null;
 }
 
-/**
- * If a word contains a number or a symbol, or is too short, it is not worth looking up.
- */
-function filterText(text: string): boolean {
-  return /\d|[!@#$%^&*(),.?":{}|<>]/.test(text) || text.length < 2;
+function isWorthLookingUp(word: string): boolean {
+  return !/\d|[!@#$%^&*(),.?":{}|<>]/.test(word) && word.length >= 2;
 }
 
 function closePanel(): void {
@@ -119,7 +115,7 @@ function escKeyHandler(e: KeyboardEvent): void {
   }
 }
 
-// Kept as-is from the original until Phase 5 replaces it with a real overlay.
+// Replaced by a real overlay in Phase 5.
 function createCustomAlert(): void {
   window.alert = (message: string) => {
     const alertBox = document.createElement("div");
@@ -212,11 +208,9 @@ function openPanel(line: CaptionLine): void {
 
   for (const word of line.text.split(" ")) {
     const cleaned = word.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "");
-    if (filterText(cleaned)) {
-      continue;
+    if (isWorthLookingUp(cleaned)) {
+      panel.appendChild(createWordButton(cleaned));
     }
-
-    panel.appendChild(createWordButton(cleaned));
   }
 
   document.body.appendChild(panel);

@@ -42,6 +42,7 @@ The model is optional and uses your own key, Claude or OpenAI.
 
 - YouTube
 - Netflix
+- Prime Video (`primevideo.com`)
 
 A new one is a file in `extension/src/content/sources` plus a line in its `index.ts`. The
 manifest's match patterns are built from that list.

@@ -1,0 +1,87 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Fake Prime watch page</title>
+<style>
+  body {
+    margin: 0;
+    background: #111;
+  }
+  .decoy {
+    width: 0;
+    height: 0;
+  }
+  video#player {
+    width: 640px;
+    height: 360px;
+  }
+  .atvwebplayersdk-player-container {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+  }
+  .captions {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 40px;
+    text-align: center;
+  }
+  .atvwebplayersdk-captions-text {
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    font-size: 24px;
+  }
+</style>
+
+<!--
+  A stand-in for a Prime watch page, reproducing what the adapter depends on and the two
+  things that make Prime different: a 0x0 decoy <video> before the real one, and a caption
+  line whose only stable class sits fourteen levels below the player container, with
+  generated names in between.
+-->
+<video class="decoy"></video>
+<div class="dv-player-fullscreen">
+  <div class="f1prfwap">
+    <div class="atvwebplayersdk-player-container f1g7im4y">
+      <video id="player" muted playsinline></video>
+      <div class="fq2lkuj">
+        <div class="fpqiyer fhl3lop">
+          <div class="f1g22xtc fgbpje3">
+            <div class="f2c2gkr"><div class="captions"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const video = document.getElementById("player");
+  const canvas = document.createElement("canvas");
+  canvas.width = 640;
+  canvas.height = 360;
+  canvas.getContext("2d").fillRect(0, 0, 640, 360);
+  video.srcObject = canvas.captureStream(30);
+
+  const captions = document.querySelector(".captions");
+
+  // Prime draws one span per line, replaced wholesale, and breaks a long line with <br>.
+  window.showCaption = (segments) => {
+    captions.innerHTML = "";
+    for (const segment of segments) {
+      const line = document.createElement("p");
+      const wrapper = document.createElement("span");
+      wrapper.className = "fbhsa9";
+      const span = document.createElement("span");
+      span.className = "atvwebplayersdk-captions-text f7j034j";
+      span.innerHTML = segment;
+      wrapper.appendChild(span);
+      line.appendChild(wrapper);
+      captions.appendChild(line);
+    }
+  };
+
+  window.clearCaption = () => {
+    captions.innerHTML = "";
+  };
+</script>

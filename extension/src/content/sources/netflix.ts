@@ -5,5 +5,6 @@ export const netflix = domCaptionSource({
   id: "netflix",
   hostPatterns: ["*://*.netflix.com/*"],
   containerSelector: ".player-timedtext",
+  containerIsCaptionLayer: true,
   segmentSelector: ".player-timedtext-text-container",
 });

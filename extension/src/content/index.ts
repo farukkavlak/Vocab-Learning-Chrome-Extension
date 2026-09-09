@@ -70,7 +70,7 @@ if (source) {
     openPanel({
       ...lines,
       captionRect: source.getCaptionRect(),
-      captionElement: source.getCaptionElement(),
+      captionElements: source.getCaptionElements(),
       captionFontSize: source.getCaptionFontSize(),
     });
   };

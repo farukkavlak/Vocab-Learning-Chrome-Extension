@@ -48,9 +48,34 @@ machinery than this earns.
 - [x] YouTube (`.ytp-caption-window-container`) and Netflix (`.player-timedtext`)
 - [x] Generate the manifest's match patterns from the registry, so a platform is declared
       once
+- [x] Prime (`.atvwebplayersdk-captions-text`), from a live session on 2026-09-09
 
 Netflix's selectors are unverified against a live session. The tests prove the mechanism,
 not the selectors.
+
+Prime is on `primevideo.com` only. It also streams from `amazon.com/gp/video`, which
+would mean injecting the content script into Amazon's shopping paths, so that is left
+until it can be checked.
+
+Prime cost the port four changes, each with a test that fails without it:
+
+- Only the caption line carries a stable class. The fourteen ancestors between it and
+  `.atvwebplayersdk-player-container` are generated (`span.fbhsa9`, `div.f1iwgj00`), so
+  the container has to be the player. Hiding that while the panel stands in would black
+  out the film, so `hideSelector` hides the lines instead.
+- Prime breaks a long line with `<br>`, which contributes no whitespace to `textContent`:
+  "confidentiality<br>codes" arrived as one word. `innerText` handles the break but reads
+  as empty while the panel has the caption hidden, which put the glued line in the buffer
+  instead. Both are avoided by replacing the breaks on a copy of the node.
+- The container is the player, so the observer fires on every seek-bar tick. A line that
+  has not changed returns before anything is measured.
+- The first `<video>` in the document is a 0x0 placeholder, so `getVideo` takes the
+  largest one rather than the first.
+
+`containerIsCaptionLayer` says whether the container can stand in for a missing segment.
+YouTube and Netflix draw captions in a layer of their own, where its text, bounds and font
+size are the caption's. Prime's is the whole player, where each of those would be wrong:
+the panel would be sized to the video and set in the player's UI font.
 
 ### 5 — `feat/overlay`
 
@@ -76,7 +101,9 @@ Screenshots of the built extension (`npm run shots`) showed what reading the cod
 - [x] The card was white over a dark video and covered the sentence. It is dark, points
       at its word, and clears the whole line.
 - [x] Esc closes the card first, the panel second. The panel takes focus so the arrow
-      keys walk the line.
+      keys walk the line. The hint says "click anywhere" rather than Esc: in fullscreen
+      the browser takes Esc to leave fullscreen, so advertising it would throw the film
+      out of fullscreen on the way past.
 
 Resuming: the shortcut and Esc were the only ways back. The content script listens for
 the video's `play` event now, so however it is started the panel gets out of the way.
@@ -148,8 +175,10 @@ Decided while building it:
   user's own key is a reasonable ask. That is why `server/` is gone: a hosted proxy buys
   nothing worth its bill.
 
-`dictionaryapi.dev` is a community service with no SLA. A paid dictionary is the obvious
-upgrade if the failures get common.
+`dictionaryapi.dev` is a community service with no SLA. It answered 522 three times while
+this was built, so a 5xx or a dropped connection is retried twice with a short backoff,
+and the reader is told the dictionary is not answering rather than shown a status code.
+A second free dictionary is the next step if it keeps happening.
 
 ### 7 — `feat/settings`
 

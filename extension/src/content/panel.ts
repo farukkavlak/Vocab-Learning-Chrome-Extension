@@ -19,13 +19,13 @@ interface PanelOptions {
   text: string;
   previous?: string | undefined;
   captionRect: Rect | null;
-  /** Hidden while the panel stands in for it, so the words are not drawn twice. */
-  captionElement: HTMLElement | null;
+  /** Hidden while the panel stands in for them, so the words are not drawn twice. */
+  captionElements: HTMLElement[];
   captionFontSize: number | null;
 }
 
 let host: HTMLElement | null = null;
-let hiddenCaption: HTMLElement | null = null;
+let hiddenCaptions: HTMLElement[] = [];
 
 function isWorthLookingUp(word: string): boolean {
   return !/\d/.test(word) && word.length >= 2;
@@ -116,7 +116,10 @@ function buildPanel(root: ShadowRoot, options: PanelOptions): HTMLElement {
 
   const hint = document.createElement("div");
   hint.className = "hint";
-  hint.textContent = "Esc to resume";
+  // Not Esc: in fullscreen the browser takes it to leave fullscreen, so it would throw
+  // the film out of fullscreen on the way past. Clicking the video always works, and
+  // starts it playing again on every player this runs on.
+  hint.textContent = "Click the video to resume";
   panel.appendChild(hint);
 
   return panel;
@@ -209,10 +212,10 @@ export function closeMeaning(): void {
 }
 
 export function closeOverlays(): void {
-  if (hiddenCaption) {
-    hiddenCaption.style.visibility = "";
-    hiddenCaption = null;
+  for (const caption of hiddenCaptions) {
+    caption.style.visibility = "";
   }
+  hiddenCaptions = [];
 
   host?.remove();
   host = null;
@@ -241,9 +244,9 @@ export function openPanel(options: PanelOptions): void {
   // Hidden only once the panel stands in for it, so no frame is left without words.
   position(panel, options.captionRect);
   panel.classList.add("appear");
-  if (options.captionElement) {
-    hiddenCaption = options.captionElement;
-    hiddenCaption.style.visibility = "hidden";
+  hiddenCaptions = options.captionElements;
+  for (const caption of hiddenCaptions) {
+    caption.style.visibility = "hidden";
   }
 
   // Not a word: focusing one would mark it as if it were selected.

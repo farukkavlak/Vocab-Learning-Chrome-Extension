@@ -57,6 +57,11 @@ const PLATFORMS = {
     pattern: "https://www.netflix.com/**",
     fixture: "fixtures/netflix.html",
   },
+  prime: {
+    url: "https://www.primevideo.com/detail/0PYX2Q4NVYSYMVUZJHDR5QEO70",
+    pattern: "https://www.primevideo.com/**",
+    fixture: "fixtures/prime.html",
+  },
 };
 
 /** The definition the stubbed dictionary returns for every word. */

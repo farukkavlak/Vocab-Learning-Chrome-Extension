@@ -1,5 +1,6 @@
 import type { CaptionSource } from "../caption-source";
 import { netflix } from "./netflix";
+import { prime } from "./prime";
 import { youtube } from "./youtube";
 
 /**
@@ -8,7 +9,7 @@ import { youtube } from "./youtube";
  * The build imports this module to generate the manifest, so adapters must not touch
  * the DOM while loading — only inside the methods they return.
  */
-export const sources: readonly CaptionSource[] = [youtube, netflix];
+export const sources: readonly CaptionSource[] = [youtube, netflix, prime];
 
 export function sourceFor(url: string): CaptionSource | null {
   return sources.find((source) => source.matches(url)) ?? null;

@@ -20,7 +20,7 @@ export interface CaptionSource {
   /** The caption on screen right now, or "" when none is showing. */
   readCurrent(): string;
   /** The element captions are drawn in; hidden while the panel stands in for it. */
-  getCaptionElement(): HTMLElement | null;
+  getCaptionElements(): HTMLElement[];
   /**
    * Where the caption text actually sits. Not the same as the caption element: players
    * draw captions inside a layer that covers the whole video, so only the text's own

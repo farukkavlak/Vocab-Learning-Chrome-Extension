@@ -8,6 +8,18 @@ interface DomCaptionSourceOptions {
   hostPatterns: readonly string[];
   containerSelector: string;
   segmentSelector: string;
+  /**
+   * What to hide while the panel stands in for the caption. Defaults to the container,
+   * which is right when the container is the caption layer. Prime's nearest stable
+   * ancestor is the whole player, so it hides the caption lines instead.
+   */
+  hideSelector?: string;
+  /**
+   * Whether the container is the caption layer itself. When it is, it can stand in for a
+   * missing segment: its text, its bounds and its font size are the caption's. Prime's
+   * container is the whole player, where each of those would be wrong.
+   */
+  containerIsCaptionLayer?: boolean;
 }
 
 /**
@@ -19,28 +31,64 @@ export function domCaptionSource(
 ): CaptionSource {
   const hostMatchers = options.hostPatterns.map(matchPatternToRegExp);
 
-  const getVideo = (): HTMLVideoElement | null =>
-    document.querySelector("video");
+  const area = (video: HTMLVideoElement): number =>
+    video.clientWidth * video.clientHeight;
+
+  // The largest one: players keep spare video elements around, and on Prime the first in
+  // the document is a 0x0 placeholder.
+  const getVideo = (): HTMLVideoElement | null => {
+    let biggest: HTMLVideoElement | null = null;
+    for (const video of document.querySelectorAll("video")) {
+      if (!biggest || area(video) > area(biggest)) {
+        biggest = video;
+      }
+    }
+
+    return biggest;
+  };
 
   const findContainer = (): HTMLElement | null =>
     document.querySelector(options.containerSelector);
 
-  const readCaption = (container: Element): string => {
-    // Joined explicitly: textContent glues segments together, and innerText separates
-    // them only when their CSS happens to be block-level.
-    const segments = container.querySelectorAll(options.segmentSelector);
-    const text = segments.length
-      ? Array.from(segments, (segment) => segment.textContent ?? "").join(" ")
-      : (container as HTMLElement).innerText;
+  /**
+   * On a copy, because <br> adds no whitespace to `textContent` and would glue the words
+   * on either side of it together. `innerText` would handle the break, but it reads as
+   * empty while the panel has the caption hidden.
+   */
+  const readText = (element: Element): string => {
+    const copy = element.cloneNode(true) as HTMLElement;
+    for (const br of copy.querySelectorAll("br")) {
+      br.replaceWith(" ");
+    }
 
-    return text.replace(/\s+/g, " ").trim();
+    return copy.textContent ?? "";
+  };
+
+  const readCaption = (container: Element): string => {
+    const segments = container.querySelectorAll(options.segmentSelector);
+    const parts =
+      segments.length || !options.containerIsCaptionLayer
+        ? Array.from(segments, readText)
+        : [readText(container)];
+
+    return parts.join(" ").replace(/\s+/g, " ").trim();
   };
 
   return {
     id: options.id,
     hostPatterns: options.hostPatterns,
     getVideo,
-    getCaptionElement: findContainer,
+
+    getCaptionElements(): HTMLElement[] {
+      const container = findContainer();
+      if (!container) {
+        return [];
+      }
+
+      return options.hideSelector
+        ? [...container.querySelectorAll<HTMLElement>(options.hideSelector)]
+        : [container];
+    },
 
     getCaptionRect(): Rect | null {
       const container = findContainer();
@@ -49,6 +97,10 @@ export function domCaptionSource(
       }
 
       const elements = [...container.querySelectorAll(options.segmentSelector)];
+      if (!elements.length && !options.containerIsCaptionLayer) {
+        return null;
+      }
+
       const rects = (elements.length > 0 ? elements : [container])
         .map((element) => element.getBoundingClientRect())
         .filter((rect) => rect.width > 0 && rect.height > 0);
@@ -68,8 +120,9 @@ export function domCaptionSource(
 
     getCaptionFontSize(): number | null {
       const container = findContainer();
+      const segment = container?.querySelector(options.segmentSelector);
       const element =
-        container?.querySelector(options.segmentSelector) ?? container;
+        segment ?? (options.containerIsCaptionLayer ? container : null);
       if (!element) {
         return null;
       }
@@ -89,11 +142,17 @@ export function domCaptionSource(
       let observed: Element | null = null;
       let observer: MutationObserver | null = null;
 
+      let last = "";
+      // Prime's container is the whole player, so this runs on every seek-bar tick.
+      // Reading the time means a layout pass, so only a new line pays for it.
       const report = (container: Element): void => {
         const text = readCaption(container);
-        if (text) {
-          onLine({ text, at: getVideo()?.currentTime ?? 0 });
+        if (!text || text === last) {
+          return;
         }
+
+        last = text;
+        onLine({ text, at: getVideo()?.currentTime ?? 0 });
       };
 
       const detachObserver = (): void => {

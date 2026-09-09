@@ -27,8 +27,10 @@ test("says so when the lookup fails instead of failing silently", async ({
 
   await page.getByRole("button", { name: "run", exact: true }).click();
 
+  // A dropped connection reads the same as a 5xx to the reader: the service is not
+  // answering, which is something they can act on.
   await expect(page.locator("#vocab-meaning")).toContainText(
-    'Could not look up "run"',
+    "The dictionary is not answering",
   );
 });
 

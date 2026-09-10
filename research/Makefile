@@ -13,7 +13,7 @@ candidates:
 	$(PY) scripts/pick_candidates.py
 
 label:
-	$(PY) scripts/label.py
+	$(PY) scripts/label.py $(if $(REDO),--redo $(REDO))
 
 split:
 	$(PY) scripts/split.py
@@ -21,7 +21,10 @@ split:
 baseline:
 	$(PY) scripts/baseline.py
 
+recheck:
+	$(PY) scripts/recheck.py
+
 clean:
 	rm -rf .venv data/raw __pycache__ scripts/__pycache__
 
-.PHONY: setup pool candidates label split baseline clean
+.PHONY: setup pool candidates label split baseline recheck clean

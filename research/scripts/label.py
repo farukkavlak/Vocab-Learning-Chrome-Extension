@@ -1,9 +1,18 @@
 """Mark the right sense for each line by hand.
 
-The senses are shuffled before they are shown. WordNet orders senses by how common
-they are, so an unshuffled list would quietly push a tired labeller towards the
-first one, and how often the first one is right is exactly what we are measuring.
-Progress is written after every answer, so quitting halfway loses nothing.
+Three things make this survivable. The senses are shuffled, because WordNet lists
+them commonest first and how often the first one is right is the thing being
+measured. Several senses can be accepted at once, because WordNet splits meanings
+more finely than anyone can reliably tell apart. And an answer can be marked
+uncertain, so we can later report accuracy with and without the shaky ones and see
+how much noise the labels carry.
+
+The model will only ever see the same single line you see. If the line does not say
+which meaning it is, neither of you can know, and `n` is the honest answer.
+
+Progress is written after every answer, so quitting halfway loses nothing. Answers
+are not final either: `--redo 4,9` reopens those lines, because reading a few more
+examples teaches you things you would like to apply to what you have already done.
 """
 
 import argparse
@@ -13,9 +22,14 @@ import textwrap
 
 BOLD, DIM, OFF = "\033[1m", "\033[2m", "\033[0m"
 
-
-def load(path):
-    return [json.loads(line) for line in open(path, encoding="utf-8")]
+HELP = """
+  1        this sense
+  1,3      both fit, they read the same to me
+  n        no sense here fits
+  ?1,3     as above, but I am not sure
+  s        skip for now
+  q        save and quit
+"""
 
 
 def save(path, rows):
@@ -24,59 +38,77 @@ def save(path, rows):
             handle.write(json.dumps(row) + "\n")
 
 
-def highlight(text, word):
-    return text.replace(word, f"{BOLD}{word}{OFF}", 1)
-
-
-def ask(row, done, total):
+def show(row, done, total):
     order = list(range(len(row["senses"])))
     random.Random(row["id"]).shuffle(order)
 
-    print(f"\n{DIM}{done}/{total} labelled{OFF}")
-    print(f"\n  {highlight(row['text'], row['word'])}\n")
+    text = row["text"].replace(row["word"], f"{BOLD}{row['word']}{OFF}", 1)
+    print(f"\n{DIM}{done}/{total} labelled  ·  {row['band']}{OFF}")
+    print(f"\n  {text}\n")
     print(f"  {BOLD}{row['lemma']}{OFF} ({row['pos']})\n")
 
     for shown, index in enumerate(order, start=1):
         sense = row["senses"][index]
-        gloss = textwrap.fill(sense["gloss"], 74, subsequent_indent="      ")
-        print(f"  {shown:>2}. {gloss}")
+        synonyms = ", ".join(sense["synonyms"])
+        print(f"  {shown:>2}. {BOLD}{synonyms}{OFF}")
+        print(textwrap.fill(sense["gloss"], 74, initial_indent="      ",
+                            subsequent_indent="      "))
         for example in sense["examples"]:
             print(f"      {DIM}\"{example}\"{OFF}")
+    return order
 
+
+def read_answer(row, order):
     while True:
-        answer = input("\n  number, [n]one fit, [s]kip, [q]uit > ").strip().lower()
-        if answer == "q":
-            return None
-        if answer == "s":
-            return "skip"
+        answer = input("\n  > ").strip().lower()
+        if answer in ("q", "s"):
+            return answer, False
+        if answer in ("h", "?", "help"):
+            print(HELP)
+            continue
+
+        unsure = answer.startswith("?")
+        answer = answer.lstrip("?").strip()
+
         if answer == "n":
-            return "none"
-        if answer.isdigit() and 1 <= int(answer) <= len(order):
-            return row["senses"][order[int(answer) - 1]]["key"]
-        print("  not one of the options")
+            return [], unsure
+        picks = [p.strip() for p in answer.split(",") if p.strip()]
+        if picks and all(p.isdigit() and 1 <= int(p) <= len(order) for p in picks):
+            keys = [row["senses"][order[int(p) - 1]]["key"] for p in picks]
+            return sorted(set(keys)), unsure
+        print(f"  not an option — press h for help")
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--file", default="data/candidates.jsonl")
+    parser.add_argument("--redo", default="", help="comma separated ids to label again")
     args = parser.parse_args()
 
-    rows = load(args.file)
+    rows = [json.loads(line) for line in open(args.file, encoding="utf-8")]
     total = len(rows)
+    redo = {int(i) for i in args.redo.replace(",", " ").split()}
+    print(HELP)
 
     for row in rows:
-        if row["label"] is not None:
+        if redo and row["id"] not in redo:
             continue
-        done = sum(1 for r in rows if r["label"] is not None)
-        answer = ask(row, done, total)
-        if answer is None:
+        if not redo and row.get("label") is not None:
+            continue
+        done = sum(1 for r in rows if r.get("label") is not None)
+        order = show(row, done, total)
+        answer, unsure = read_answer(row, order)
+        if answer == "q":
             break
-        if answer != "skip":
-            row["label"] = answer
-            save(args.file, rows)
+        if answer == "s":
+            continue
+        row["label"], row["unsure"] = answer, unsure
+        save(args.file, rows)
 
-    done = sum(1 for r in rows if r["label"] is not None)
-    print(f"\n{done}/{total} labelled. Run again to carry on.\n")
+    done = sum(1 for r in rows if r.get("label") is not None)
+    unsure = sum(1 for r in rows if r.get("unsure"))
+    print(f"\n{done}/{total} labelled, {unsure} of them marked unsure.")
+    print("Run `make label` again to carry on.\n")
 
 
 if __name__ == "__main__":

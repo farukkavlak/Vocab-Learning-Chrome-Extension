@@ -69,7 +69,12 @@ def candidates(line, frequency):
 
 
 def sense_list(senses):
-    return [{"key": s.name(), "gloss": s.definition(), "examples": s.examples()[:2]}
+    # The synonyms are the fastest way to recognise a sense. "strongbox" says more
+    # in one word than the gloss does in a line.
+    return [{"key": s.name(),
+             "synonyms": [l.name().replace("_", " ") for l in s.lemmas()],
+             "gloss": s.definition(),
+             "examples": s.examples()[:2]}
             for s in senses]
 
 

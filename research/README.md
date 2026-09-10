@@ -20,9 +20,12 @@ make candidates  # pick 200 lines, one word each, worth looking up
 make label       # mark the right sense by hand                        (you, ~2 hours)
 make split       # 150 to work with, 51 sealed until phase 17
 make baseline    # the number
+make recheck     # a few days later: how often do you agree with yourself?
 ```
 
 `make label` saves after every answer, so stopping and running it again is fine.
+`make label REDO=4,9` reopens lines you have already answered — the first twenty
+teach you how to read the sense list, and you will want to revisit some of them.
 
 ### Why the pieces are the way they are
 
@@ -49,6 +52,22 @@ grammatical work, not carrying a meaning to look up.
 first. Shown in that order, a tired labeller drifts towards the first one — and how
 often the first one is right is the exact thing being measured. Shuffling keeps the
 answer honest.
+
+**Several senses can be accepted, and an answer can be marked unsure.** WordNet
+splits meanings far more finely than anyone can reliably tell apart — trained native
+annotators agree with each other on roughly three WordNet labels in four. That is a
+property of the sense list, not of the labeller, so the tool stops pretending
+otherwise: `1,3` accepts both, and `?1` records a doubt. The score is then reported
+with and without the doubtful lines.
+
+**Nothing but the line is shown, on purpose.** The model gets the same single line at
+run time. If the line does not settle which meaning it is, neither of you can know,
+and `n` is the honest answer rather than a guess.
+
+**`make recheck` measures the ceiling.** Relabel thirty lines blind, days later, and
+see how often you agree with your earlier self. No model judged on these labels can
+honestly claim to beat that number, and a model score quoted without it means less
+than it appears to.
 
 **Fifty-one lines are sealed.** Anything tuned against a set of examples looks better
 on that set than it will in the wild. The sealed lines are opened once, in phase 17,

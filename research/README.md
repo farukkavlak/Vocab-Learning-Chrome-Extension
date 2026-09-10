@@ -1,0 +1,63 @@
+# research
+
+Everything here builds the model. None of it ships. The extension only ever sees the
+files phase 16 exports, so this folder can stay slow, messy in its data, and written
+in Python.
+
+`data/raw/` is downloaded and is not in git. Everything else in `data/` is small,
+hand-made, and worth keeping.
+
+## Phase 10 — the baseline
+
+The point of this phase is one number: how often is the extension right today, when
+it shows the first sense the dictionary lists? Every later phase is measured against
+it. Without it there is no way to tell an improvement from a change.
+
+```sh
+make setup       # a virtualenv and the NLTK data files
+make pool        # sample 200k subtitle lines, count word frequencies  (~7 min)
+make candidates  # pick 200 lines, one word each, worth looking up
+make label       # mark the right sense by hand                        (you, ~2 hours)
+make split       # 150 to work with, 51 sealed until phase 17
+make baseline    # the number
+```
+
+`make label` saves after every answer, so stopping and running it again is fine.
+
+### Why the pieces are the way they are
+
+**The corpus is streamed, not downloaded.** The OpenSubtitles file is 3.6 GB gzipped.
+We read it from the start, keep what is usable, and stop at a byte budget. Reservoir
+sampling spreads the sample over everything we read, so the set is not two hundred
+lines from the same three films.
+
+**The target word is chosen by frequency, not by ambiguity.** Picking the word with
+the most senses gives you `get`, `go` and `have` on every line, and nobody looks those
+up. Frequency comes from the pool itself, which measures the language of film rather
+than of English in general.
+
+**The set is split into three frequency bands, and accuracy is reported for each.**
+Who clicks a word depends on their level: a beginner stops at `play` and `run`,
+someone further along only at `vaudeville`. Testing on rare words alone would hide
+the hardest cases, because a word stays common by carrying many meanings — the
+everyday band averages 11.8 senses a word against 6.3 in the uncommon band. One
+overall number would average that difference away. Words above five thousand
+occurrences are left out: `do` and `have` are tagged as verbs but are doing
+grammatical work, not carrying a meaning to look up.
+
+**The senses are shuffled before you see them.** WordNet lists senses commonest
+first. Shown in that order, a tired labeller drifts towards the first one — and how
+often the first one is right is the exact thing being measured. Shuffling keeps the
+answer honest.
+
+**Fifty-one lines are sealed.** Anything tuned against a set of examples looks better
+on that set than it will in the wild. The sealed lines are opened once, in phase 17,
+and are spread evenly across the three bands so they cannot flatter us by accident.
+
+### On WordNet
+
+Phase 10 uses WordNet as its sense list, and that is not the same as deciding to ship
+it. It comes with NLTK, the baseline measures ranking rather than coverage, and every
+existing hand-labelled WSD dataset uses its sense keys. Phase 11 measures WordNet and
+Wiktionary side by side and decides. Labels survive a switch, because the model
+compares the text of a sense, not its key.

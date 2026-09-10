@@ -251,6 +251,232 @@ Four things the suite cannot cover:
 Checked by hand on YouTube, 2026-09-09: the panel showed the words of the line on screen,
 and the buffer served the previous line after the caption had cleared.
 
+## Part two: the model
+
+Decided 2026-09-09: build the meaning provider ourselves, so the extension answers with no
+key and no network. Anthropic and OpenAI stay, as the better answer for whoever has a key.
+
+The job is not to write meanings. A dictionary already holds them. The job is to pick the
+one the line means:
+
+> `run` has 63 senses. Which one is this?
+
+That is classification, not writing, and small models are good at it. A 22M parameter
+sentence encoder is about 23MB once quantized and answers in milliseconds on the reader's
+own machine.
+
+Claude is still used, but at build time, not at run time. It labels our training data and
+fills gaps in the dictionary. The result ships as a data file. Nobody's browser ever calls
+it.
+
+### How to work through this
+
+One phase per branch, as before, plus two rules for this part:
+
+1. **Nothing is written that has not been explained first.** Every phase opens with what it
+   teaches. If a term appears in the code but not in this plan, the plan is wrong and gets
+   fixed before the code is.
+2. **Every phase ends with a number.** Not "it feels better". The next phase begins by
+   beating the last number.
+
+The work lives in `research/`, in Python, outside the extension. Only phase 16 touches
+`extension/`. If phase 12 or 14 fails to beat its baseline, we stop and keep the dictionary
+provider. That is a real outcome, not a failure.
+
+### 10 — `research/baseline`
+
+**Learn:** what a test set is, why it is built before anything else, how accuracy is
+measured, and why the model must never see the test set while it is being trained.
+
+- [ ] `research/` with a Python environment and a `Makefile`
+- [ ] 200 lines pulled from OpenSubtitles, each with one word worth a lookup
+- [ ] Mark the right sense for each by hand, choosing from the sense list
+- [ ] Split them: 150 to work with, 50 sealed until phase 17
+- [ ] Measure how often "just show the first sense" is right
+
+**Exit:** one number. Every later phase is compared to it.
+
+Doing this first is the whole discipline. Without it there is no way to tell an improvement
+from a change.
+
+### 11 — `research/lexicon`
+
+**Learn:** tokenizing, lemmatizing, and how to measure whether a data source covers your
+problem. No machine learning in this phase at all.
+
+WordNet stopped in 2011 and was built from written English. Subtitles are spoken English.
+Wiktionary is updated daily and holds slang, `gonna`, and `sus`. `kaikki.org` publishes it
+as machine readable JSON, so it does not have to be scraped.
+
+- [ ] Build `vocab.db` (SQLite) from the Wiktionary dump: word, part of speech, senses,
+      examples
+- [ ] Add a lemmatizer so `ran` finds `run`. This alone fixes the misses that made
+      `dictionaryapi.dev` answer nothing for common past tenses.
+- [ ] Add CMUdict for pronunciation and a CEFR word list for level
+- [ ] Fold in a phrasal verb list, so `run into` is not looked up as `run`
+- [ ] Measure coverage: of the distinct words in 10,000 subtitle lines, what share has an
+      entry? Report WordNet and Wiktionary side by side.
+
+**Exit:** two coverage numbers, and a database file with a known size.
+
+At the end of this phase the extension could already ship offline, at baseline quality.
+Everything after it is about picking a better sense.
+
+### 12 — `research/embeddings`
+
+**Learn:** what an embedding is, what cosine similarity measures, and what "zero-shot"
+means. This is the phase where meaning turning into numbers stops being a metaphor.
+
+The idea is small. Turn the subtitle line into a list of numbers. Turn each candidate sense
+into a list of numbers. Pick the sense whose numbers sit closest to the line's.
+
+- [ ] Run `all-MiniLM-L6-v2` locally through `sentence-transformers`
+- [ ] Embed the line, embed every sense, take the nearest
+- [ ] Measure against phase 10, on the 150, never the 50
+- [ ] Look at 20 failures by hand and write down what kind they are
+
+**Exit:** accuracy with no training at all. This is usually well above the baseline, which
+is worth seeing before spending a week on training.
+
+### 13 — `research/dataset`
+
+**Learn:** distillation, what makes a label trustworthy, and why a lopsided dataset teaches
+a lopsided model.
+
+Distillation means a large model teaches a small one. Claude labels examples, the small
+model learns from the labels, and afterwards the small model works alone.
+
+- [ ] Pull 10,000 subtitle lines and ask Claude which sense each one uses
+- [ ] Check 100 of the labels by hand and report how often the teacher is wrong. A teacher
+      that is wrong 10% of the time sets a ceiling on the student.
+- [ ] Search the corpus for rare senses on purpose and add those lines. Left alone, the
+      data is nearly all common senses, and the model learns to always guess the common
+      one. That is the exact opposite of what a reader needs, because a reader looks a word
+      up when the usage is odd.
+- [ ] Add "none of these senses fit" examples, which phase 15 needs
+- [ ] Split into train, validation and test, and record the split
+
+**Exit:** a dataset with a measured label error rate and a sense distribution we chose
+rather than inherited. Cost is a few dollars of Haiku calls.
+
+### 14 — `research/train`
+
+**Learn:** the training loop itself. Loss, epoch, batch, learning rate, and what a loss
+curve looks like when a model is memorizing instead of learning.
+
+- [ ] Fine-tune the encoder so a line lands near its right sense and away from the wrong
+      ones
+- [ ] Watch training loss and validation loss together. Training loss falling while
+      validation loss rises is overfitting, and it is the single most useful thing to learn
+      to recognize.
+- [ ] Measure on the phase 13 test split
+- [ ] Try one smaller and one larger model and record accuracy, size and speed for each
+
+**Exit:** a trained model that beats phase 12, or evidence that it does not. Runs on a
+laptop CPU in under an hour, or on a free Colab GPU in minutes.
+
+The smaller and larger runs decide more than model choice. If the larger model is clearly
+better, the ceiling is size, and a model too big for a browser could be served from a
+machine we already own. If both plateau in the same place, the ceiling is the data, and a
+bigger machine changes nothing. Offline stays the goal either way: a server means we see
+what people look up, and it means the extension stops working the day the server does.
+
+### 15 — `research/confidence`
+
+**Learn:** why a similarity score is not a probability, what calibration is, and the trade
+between answering more often and answering correctly.
+
+The model always returns its nearest sense, even when nothing fits. It has to be able to
+say so.
+
+- [ ] Pick a threshold on the validation set, never the test set
+- [ ] Plot accuracy against how often the model answers, and choose the point deliberately
+- [ ] Below the threshold the card says the answer is uncertain and offers a model lookup
+      to whoever has a key
+
+**Exit:** a threshold with the accuracy and the answer rate that come with it. The easy
+majority is handled offline for free, and the hard remainder is handed over honestly.
+
+### 16 — `feat/local-provider`
+
+**Learn:** quantization, what an inference runtime does, and why a Manifest V3 service
+worker cannot hold a model.
+
+- [ ] Export to ONNX and quantize to int8. Roughly a quarter of the size for a small
+      accuracy cost, which gets measured rather than assumed.
+- [ ] Confirm the quantized model gives the same answers as the Python one on the test set.
+      This step is skipped often and is where silent breakage lives.
+- [ ] Run it with `transformers.js` inside a `chrome.offscreen` document. The worker is
+      killed after about 30 seconds idle, so a model loaded there would reload constantly.
+      The offscreen document stays alive and the worker messages it.
+- [ ] `providers/local.ts`, same interface as `anthropic.ts` and `openai.ts`, no key, no
+      host permission, and the default choice
+- [ ] Ship `vocab.db` and the weights as data. Manifest V3 bans remote code, but weights
+      are data. The runtime `.wasm` is code and has to be bundled.
+
+**Exit:** the extension answers with the network off.
+
+### 17 — `docs/comparison`
+
+**Learn:** how to report a result without overselling it.
+
+- [ ] Open the 50 sealed lines from phase 10 and score every provider on them, once
+- [ ] A table of accuracy, latency, cost per lookup and download size for: first sense,
+      untrained embeddings, our model, Haiku, GPT-4o-mini
+- [ ] Write down where ours loses, not only where it wins
+- [ ] Put the table in the README
+
+**Exit:** the table. It is the most valuable output of this whole part.
+
+### 18 — `research/writing`
+
+Only if phase 17 says a chosen sense is not enough. An encoder picks, it cannot write. To
+write a sentence-specific explanation the model has to generate text, which is a different
+architecture and a much larger job.
+
+**Learn:** the difference between an encoder and a decoder, and why generation is harder to
+judge than classification.
+
+- [ ] Read up on definition modeling, which is the name for this task
+- [ ] Distill from Claude again, this time on written explanations rather than labels
+- [ ] A 200M to 500M parameter model, which means a real GPU and a much larger download
+- [ ] Judge the output, which is the hard part: there is no single right answer, so
+      accuracy no longer applies
+
+Written down so it is not forgotten. Not started until phase 17 justifies it. A dictionary
+sense chosen well may simply be the right answer for people learning English inside
+English, and if so this phase never happens.
+
+### Data sources
+
+All free and open:
+
+- **OpenSubtitles** — our own domain, billions of words of subtitles
+- **Wiktionary via kaikki.org** — current, covers slang, machine readable
+- **SemCor and SemEval WSD** — sense-labelled gold data, for comparison
+- **WiC** — a benchmark asking whether two lines use a word the same way
+- **CMUdict** — pronunciation
+- **CEFR-J, EFLLex** — level lists
+- **spaCy** — lemmatizer and part of speech tagger
+
+### What this will not do
+
+Honest limits, after the ones we can fix with data:
+
+1. **It picks, it does not write.** The reader gets a real dictionary sense, not prose
+   composed for their line. Phase 18 exists for this and may never be needed.
+2. **World knowledge.** "He pulled a Houdini" needs to know who Houdini was. No lexicon
+   holds that.
+3. **Irony and wordplay.** The literal sense is the wrong answer, and there is no right one
+   to pick.
+
+Not on the list, because they are not really limits:
+
+- **Context beyond the line.** Claude only sees the line too. Ours is not behind here.
+- **Slang and new words.** A Wiktionary problem, solved in phase 11 by choosing it.
+- **Rare senses.** A data balance problem, handled in phase 13.
+- **Saying "I don't know".** A calibration problem, handled in phase 15.
+
 ## Deferred
 
 **Hosted backend.** Settled in phase 6: bring-your-own-key, and `server/` is deleted.

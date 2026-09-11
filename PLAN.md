@@ -289,15 +289,29 @@ provider. That is a real outcome, not a failure.
 measured, and why the model must never see the test set while it is being trained.
 
 - [ ] `research/` with a Python environment and a `Makefile`
-- [ ] 200 lines pulled from OpenSubtitles, each with one word worth a lookup
+- [ ] 200 lines pulled from OpenSubtitles, each with one word worth a lookup, spread
+      evenly over three frequency bands so the everyday words that carry the most
+      meanings are not left out
 - [ ] Mark the right sense for each by hand, choosing from the sense list
 - [ ] Split them: 150 to work with, 50 sealed until phase 17
-- [ ] Measure how often "just show the first sense" is right
+- [ ] Measure how often "just show the first sense" is right, per band and overall
+- [ ] Relabel 30 of them blind, days later, and measure how often you agree with
+      yourself. No model can be judged past that number.
+- [ ] Run the phase 13 panel of models over the same 200 lines and compare it to the
+      hand labels. How often a unanimous panel matches a person is what says whether
+      phase 13 may label ten thousand lines without us reading them.
 
 **Exit:** one number. Every later phase is compared to it.
 
 Doing this first is the whole discipline. Without it there is no way to tell an improvement
 from a change.
+
+These 200 are labelled by hand and no model touches them. Models agree with each other
+more readily than they are right, and unanimity concentrates on the easy lines, so a set
+labelled that way would carry perhaps five to ten wrong labels in every hundred. On 200
+lines that is the same size as the difference we are trying to measure. It is also the
+only reason phase 17 means anything: a test set written by Claude and GPT would score
+Claude and GPT well, and would score a model distilled from Claude well too.
 
 ### 11 — `research/lexicon`
 
@@ -308,6 +322,13 @@ WordNet stopped in 2011 and was built from written English. Subtitles are spoken
 Wiktionary is updated daily and holds slang, `gonna`, and `sus`. `kaikki.org` publishes it
 as machine readable JSON, so it does not have to be scraped.
 
+There is a second reason, and it is the stronger one. Annotators asked to choose among
+WordNet's senses agree with each other between 67% and 78% of the time; on coarser sense
+inventories they agree around 90%. That gap is not a detail of the labelling process, it
+is a ceiling on the whole task. Senses nobody can tell apart cannot be told apart by a
+model either, and splitting `feel` into thirteen entries buys nothing a reader wants.
+Choosing the inventory may matter more than choosing the model.
+
 - [ ] Build `vocab.db` (SQLite) from the Wiktionary dump: word, part of speech, senses,
       examples
 - [ ] Add a lemmatizer so `ran` finds `run`. This alone fixes the misses that made
@@ -316,8 +337,12 @@ as machine readable JSON, so it does not have to be scraped.
 - [ ] Fold in a phrasal verb list, so `run into` is not looked up as `run`
 - [ ] Measure coverage: of the distinct words in 10,000 subtitle lines, what share has an
       entry? Report WordNet and Wiktionary side by side.
+- [ ] Count senses per word in both, and relabel 30 of the phase 10 lines against
+      Wiktionary. Coverage is only half the question; how often a person can decide is
+      the other half.
 
-**Exit:** two coverage numbers, and a database file with a known size.
+**Exit:** two coverage numbers, a count of how finely each source splits meanings, and a
+database file with a known size.
 
 At the end of this phase the extension could already ship offline, at baseline quality.
 Everything after it is about picking a better sense.
@@ -330,6 +355,14 @@ means. This is the phase where meaning turning into numbers stops being a metaph
 The idea is small. Turn the subtitle line into a list of numbers. Turn each candidate sense
 into a list of numbers. Pick the sense whose numbers sit closest to the line's.
 
+This shape has a name and a published result. Blevins and Zettlemoyer called it a
+bi-encoder: one encoder reads the line, another reads the gloss, and the nearest sense
+wins. It scored 79.0 F1 against a first-sense baseline of 65.5, and the code is open. We
+are not inventing an architecture, we are shrinking a known one — their model is two
+BERT-bases, around 220M parameters, and ours has to fit in a browser at a tenth of that.
+Expect to land below 79.0. The number to beat is 65.5.
+
+- [ ] Read the bi-encoder paper and its code before writing any
 - [ ] Run `all-MiniLM-L6-v2` locally through `sentence-transformers`
 - [ ] Embed the line, embed every sense, take the nearest
 - [ ] Measure against phase 10, on the 150, never the 50
@@ -343,21 +376,41 @@ is worth seeing before spending a week on training.
 **Learn:** distillation, what makes a label trustworthy, and why a lopsided dataset teaches
 a lopsided model.
 
-Distillation means a large model teaches a small one. Claude labels examples, the small
-model learns from the labels, and afterwards the small model works alone.
+Distillation means a large model teaches a small one. The teacher labels examples, the
+small model learns from the labels, and afterwards the small model works alone.
 
-- [ ] Pull 10,000 subtitle lines and ask Claude which sense each one uses
+Most of the teaching does not need a teacher at all. SemCor is 187,000 sense annotations
+made by people, it ships with NLTK, and it is what the bi-encoder in phase 12 was trained
+on. It costs nothing and it is not guessing. What it is not is film: SemCor is books and
+journalism, and our sentences are spoken, short and full of idiom.
+
+So the data has two sources with two jobs. SemCor teaches the task. Model labels over
+subtitle lines teach the register. Where models are used they answer as a panel rather
+than alone, each seeing the senses in its own shuffled order, because the student can
+never be better than its labels and a single model is wrong more often than it sounds —
+one evaluation puts GPT-4 between 56% and 77% on this task depending on the setup.
+
+- [ ] Train on SemCor first and measure. It may be most of the distance.
+- [ ] Pull 10,000 subtitle lines and put each one to several models independently
+- [ ] Where they agree, take the label. Where they split, keep the line and the split.
 - [ ] Check 100 of the labels by hand and report how often the teacher is wrong. A teacher
       that is wrong 10% of the time sets a ceiling on the student.
+- [ ] The lines the panel could not agree on are the genuinely ambiguous ones, and they
+      are what phase 15 needs to learn when to say nothing
 - [ ] Search the corpus for rare senses on purpose and add those lines. Left alone, the
       data is nearly all common senses, and the model learns to always guess the common
       one. That is the exact opposite of what a reader needs, because a reader looks a word
-      up when the usage is odd.
+      up when the usage is odd. The bi-encoder paper measures the size of this: 94.1 F1 on
+      the commonest sense of a word against 52.6 on the rest. The gap, not the average, is
+      the real problem.
 - [ ] Add "none of these senses fit" examples, which phase 15 needs
 - [ ] Split into train, validation and test, and record the split
 
 **Exit:** a dataset with a measured label error rate and a sense distribution we chose
-rather than inherited. Cost is a few dollars of Haiku calls.
+rather than inherited, plus a second, larger test set labelled by the panel. It is
+reported separately from the hand-labelled 200 and never replaces it: large enough to
+narrow the error bars, biased enough that it cannot settle a comparison on its own. Cost
+is a few dollars of API calls.
 
 ### 14 — `research/train`
 
@@ -370,6 +423,9 @@ curve looks like when a model is memorizing instead of learning.
       validation loss rises is overfitting, and it is the single most useful thing to learn
       to recognize.
 - [ ] Measure on the phase 13 test split
+- [ ] Report it split by how common the sense is, not as one average. A model at 94 on
+      commonest senses and 53 on the rest averages to something respectable and is still
+      wrong exactly when it is asked.
 - [ ] Try one smaller and one larger model and record accuracy, size and speed for each
 
 **Exit:** a trained model that beats phase 12, or evidence that it does not. Runs on a
@@ -404,6 +460,9 @@ worker cannot hold a model.
 
 - [ ] Export to ONNX and quantize to int8. Roughly a quarter of the size for a small
       accuracy cost, which gets measured rather than assumed.
+- [ ] If it is still too heavy, look at distilling the encoder to static embeddings
+      (Model2Vec and the like). Far smaller and far faster, at a cost in accuracy that,
+      again, gets measured.
 - [ ] Confirm the quantized model gives the same answers as the Python one on the test set.
       This step is skipped often and is where silent breakage lives.
 - [ ] Run it with `transformers.js` inside a `chrome.offscreen` document. The worker is
@@ -423,6 +482,11 @@ worker cannot hold a model.
 - [ ] Open the 50 sealed lines from phase 10 and score every provider on them, once
 - [ ] A table of accuracy, latency, cost per lookup and download size for: first sense,
       untrained embeddings, our model, Haiku, GPT-4o-mini
+- [ ] Put the published numbers in the same table — a first-sense baseline of 65.5 and a
+      bi-encoder at 79.0 — so ours is read against the field and not against itself
+- [ ] Put the self-agreement figure from phase 10 next to them. A model at 74 where a
+      person repeats themselves 76 of the time is a different result from a model at 74
+      where a person repeats themselves 95.
 - [ ] Write down where ours loses, not only where it wins
 - [ ] Put the table in the README
 
